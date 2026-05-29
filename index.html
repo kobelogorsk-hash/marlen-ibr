@@ -3,12 +3,12 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Открой Дверь</title>
+    <title>Ключ и Дверь</title>
     <style>
         body {
             margin: 0;
             padding: 20px;
-            background-color: #1a1a2e;
+            background-color: #2d2d2d;
             color: white;
             font-family: Arial, sans-serif;
             display: flex;
@@ -16,9 +16,9 @@
             align-items: center;
         }
         canvas {
-            border: 3px solid #4a4a6a;
-            background: linear-gradient(to bottom, #87CEEB, #5BA3D0);
-            box-shadow: 0 0 20px rgba(135, 206, 235, 0.5);
+            border: 3px solid #555;
+            background: #3a3a3a;
+            box-shadow: 0 0 20px rgba(0,0,0,0.5);
         }
         #ui {
             margin-bottom: 10px;
@@ -28,72 +28,43 @@
             margin-top: 10px;
             font-size: 20px;
             color: #ffd700;
-            text-shadow: 2px 2px 4px rgba(0,0,0,0.5);
         }
         h1 {
             color: #87CEEB;
-            text-shadow: 2px 2px 4px rgba(0,0,0,0.5);
         }
     </style>
 </head>
 <body>
     <div id="ui">
-        <h1>🚪 ОТКРОЙ ДВЕРЬ 🦀</h1>
-        <p>Управление: A/D или Стрелки Влево/Вправо | Пробел - Прыжок</p>
+        <h1>🔑 КЛЮЧ И ДВЕРЬ 🚪</h1>
+        <p>Управление: Стрелки или WASD | Возьми ключ и открой дверь!</p>
     </div>
     <canvas id="gameCanvas"></canvas>
-    <div id="message">Доберись до двери!</div>
+    <div id="message">Найди ключ!</div>
 
     <script>
-        // ============================================
-        // КОНФИГУРАЦИЯ ИГРЫ - ПЛАТФОРМЕР С БОКОВЫМ ВИДОМ
-        // ============================================
-        const CANVAS_WIDTH = 900;
-        const CANVAS_HEIGHT = 500;
-        const GRAVITY = 0.6;
-        const JUMP_FORCE = -14;
-        const MOVE_SPEED = 5;
-        const PLAYER_SIZE = { width: 35, height: 50 };
-        const CRAB_SIZE = { width: 40, height: 30 };
+        const CANVAS_WIDTH = 800;
+        const CANVAS_HEIGHT = 600;
+        const PLAYER_SPEED = 4;
+        const PLAYER_SIZE = 30;
         
-        // Цвета объектов
         const COLORS = {
-            SKY_TOP: '#87CEEB',      // Голубое небо (верх)
-            SKY_BOTTOM: '#5BA3D0',   // Голубое небо (низ)
-            PLAYER_BODY: '#FFB347',  // Оранжевый человечек
-            PLAYER_HEAD: '#FFE4C4',  // Светло-бежевая голова
-            CRAB_BODY: '#FF6B6B',    // Красный крабик
-            CRAB_LEGS: '#FF4747',    // Ноги краба
-            DOOR_FRAME: '#8B4513',   // Коричневая дверь
-            DOOR_PANEL: '#DEB887',   // Светлая панель двери
-            PLATFORM: '#654321',     // Коричневая платформа
-            PLATFORM_GRASS: '#228B22', // Трава на платформе
-            LAVA: '#FF4500',         // Оранжевая лава
-            LAVA_GLOW: '#FF6347'     // Светящаяся лава
+            FLOOR: '#3a3a3a',
+            WALL: '#555555',
+            PLAYER: '#4CAF50',
+            KEY: '#FFD700',
+            DOOR_LOCKED: '#8B4513',
+            DOOR_OPEN: '#654321'
         };
 
-        // ============================================
-        // СОСТОЯНИЕ ИГРЫ
-        // ============================================
         let canvas, ctx;
-        let level = 1;
-        let player = { 
-            x: 50, 
-            y: 300, 
-            vx: 0, 
-            vy: 0, 
-            onGround: false,
-            facingRight: true
-        };
-        let door = { x: 0, y: 0, width: 50, height: 70 };
-        let crabs = [];          // Массив крабиков-монстров
-        let platforms = [];      // Массив платформ {x, y, width, height}
-        let lavaPits = [];       // Массив лавовых пропастей {x, y, width, height}
-        let keys = {};           // Состояние клавиш
+        let player = { x: 50, y: 50 };
+        let key = { x: 0, y: 0, width: 20, height: 20, taken: false };
+        let door = { x: 0, y: 0, width: 40, height: 60, open: false };
+        let walls = [];
+        let keysPressed = {};
+        let won = false;
         
-        // ============================================
-        // ИНИЦИАЛИЗАЦИЯ
-        // ============================================
         window.onload = function() {
             canvas = document.getElementById('gameCanvas');
             ctx = canvas.getContext('2d');
@@ -102,201 +73,90 @@
             canvas.height = CANVAS_HEIGHT;
             
             document.addEventListener('keydown', (e) => {
-                keys[e.code] = true;
-                if(['Space', 'ArrowUp', 'ArrowDown'].includes(e.code)) e.preventDefault();
+                keysPressed[e.code] = true;
+                if(['Space', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.code)) e.preventDefault();
             });
-            document.addEventListener('keyup', (e) => keys[e.code] = false);
+            document.addEventListener('keyup', (e) => keysPressed[e.code] = false);
             
-            requestAnimationFrame(gameLoop);
-            generateLevel();
+            initLevel();
+            gameLoop();
         };
 
-        // ============================================
-        // ГЕНЕРАЦИЯ УРОВНЯ - ПЛАТФОРМЕР
-        // ============================================
-        function generateLevel() {
-            // Базовая платформа (земля) с разрывами для лавы
-            const groundY = CANVAS_HEIGHT - 40;
-            
-            // Сброс состояния игрока - спавн на стартовой платформе
+        function initLevel() {
             player.x = 50;
-            player.y = groundY - PLAYER_SIZE.height;
-            player.vx = 0;
-            player.vy = 0;
-            player.onGround = false;
-            
-            platforms = [];
-            crabs = [];
-            lavaPits = [];
-            
-            // Стартовая платформа
-            platforms.push({ x: 0, y: groundY, width: 200, height: 40 });
-            
-            // Платформы в середине с лавами между ними
-            let currentX = 250;
-            const numPlatforms = 3 + level; // Больше платформ с каждым уровнем
-            
-            for (let i = 0; i < numPlatforms; i++) {
-                const platformWidth = 100 + Math.random() * 80;
-                const gapSize = 60 + Math.random() * 50; // Пропастей с лавой
-                
-                // Лава под платформой
-                if (i > 0) {
-                    lavaPits.push({ 
-                        x: currentX - gapSize + 20, 
-                        y: groundY - 10, 
-                        width: gapSize - 20, 
-                        height: 50 
-                    });
-                }
-                
-                // Платформа
-                platforms.push({ 
-                    x: currentX, 
-                    y: groundY, 
-                    width: platformWidth, 
-                    height: 40 
-                });
-                
-                currentX += platformWidth + gapSize;
-            }
-            
-            // Финальная платформа с дверью
-            const finalPlatformX = CANVAS_WIDTH - 150;
-            platforms.push({ x: finalPlatformX, y: groundY, width: 150, height: 40 });
-            
-            // Дверь на финальной платформе
-            door.x = finalPlatformX + 50;
-            door.y = groundY - door.height;
-            
-            // Дополнительные платформы в воздухе
-            const numFloatingPlatforms = 2 + level;
-            for (let i = 0; i < numFloatingPlatforms; i++) {
-                const fpX = 150 + i * 120;
-                const fpY = 200 + Math.random() * 150;
-                platforms.push({ x: fpX, y: fpY, width: 90, height: 20 });
-            }
-            
-            // Крабики-монстры на платформах
-            const numCrabs = 1 + Math.floor(level / 2);
-            for (let i = 0; i < numCrabs; i++) {
-                const crabPlatform = platforms[Math.floor(Math.random() * (platforms.length - 1)) + 1];
-                crabs.push({ 
-                    x: crabPlatform.x + crabPlatform.width / 2, 
-                    y: crabPlatform.y - CRAB_SIZE.height,
-                    startX: crabPlatform.x,
-                    endX: crabPlatform.x + crabPlatform.width - CRAB_SIZE.width,
-                    direction: 1,
-                    speed: 1.5 + level * 0.3
-                });
-            }
-            
+            player.y = 50;
+            key.taken = false;
+            door.open = false;
+            won = false;
+            key.x = CANVAS_WIDTH - 80;
+            key.y = CANVAS_HEIGHT - 80;
+            door.x = CANVAS_WIDTH - 100;
+            door.y = 50;
+            walls = [
+                { x: 200, y: 0, width: 20, height: 400 },
+                { x: 400, y: 200, width: 20, height: 400 },
+                { x: 600, y: 0, width: 20, height: 350 },
+                { x: 150, y: 450, width: 300, height: 20 }
+            ];
             updateMessage();
         }
 
-        // ============================================
-        // ФИЗИКА ИГРОКА - ПЛАТФОРМЕР
-        // ============================================
-        function updatePlayer() {
-            // Горизонтальное движение
-            player.vx = 0;
-            if (keys['ArrowLeft'] || keys['KeyA']) {
-                player.vx = -MOVE_SPEED;
-                player.facingRight = false;
-            }
-            if (keys['ArrowRight'] || keys['KeyD']) {
-                player.vx = MOVE_SPEED;
-                player.facingRight = true;
-            }
+        function update() {
+            if (won) return;
             
-            // Прыжок
-            if ((keys['Space'] || keys['ArrowUp'] || keys['KeyW']) && player.onGround) {
-                player.vy = JUMP_FORCE;
-                player.onGround = false;
+            let dx = 0, dy = 0;
+            if (keysPressed['ArrowLeft'] || keysPressed['KeyA']) dx = -PLAYER_SPEED;
+            if (keysPressed['ArrowRight'] || keysPressed['KeyD']) dx = PLAYER_SPEED;
+            if (keysPressed['ArrowUp'] || keysPressed['KeyW']) dy = -PLAYER_SPEED;
+            if (keysPressed['ArrowDown'] || keysPressed['KeyS']) dy = PLAYER_SPEED;
+            
+            if (dx !== 0 && dy !== 0) {
+                dx *= 0.707;
+                dy *= 0.707;
             }
             
-            // Применяем гравитацию
-            player.vy += GRAVITY;
-            
-            // Ограничиваем максимальную скорость падения (чтобы не проваливался)
-            const maxFallSpeed = 15;
-            if (player.vy > maxFallSpeed) {
-                player.vy = maxFallSpeed;
-            }
-            
-            // Движение по X
-            player.x += player.vx;
-            
-            // Проверка границ экрана по X
-            if (player.x < 0) player.x = 0;
-            if (player.x + PLAYER_SIZE.width > CANVAS_WIDTH) player.x = CANVAS_WIDTH - PLAYER_SIZE.width;
-            
-            // Коллизия с платформами по X
-            for (let platform of platforms) {
-                if (checkCollision(player, platform)) {
-                    if (player.vx > 0) {
-                        player.x = platform.x - PLAYER_SIZE.width;
-                    } else if (player.vx < 0) {
-                        player.x = platform.x + platform.width;
-                    }
+            let newX = player.x + dx;
+            let collisionX = false;
+            for (let wall of walls) {
+                if (checkCollision({ x: newX, y: player.y, width: PLAYER_SIZE, height: PLAYER_SIZE }, wall)) {
+                    collisionX = true;
+                    break;
                 }
             }
+            if (!collisionX && newX >= 0 && newX <= CANVAS_WIDTH - PLAYER_SIZE) {
+                player.x = newX;
+            }
             
-            // Движение по Y с суб-шагами для предотвращения проваливания
-            player.onGround = false;
-            
-            // Разбиваем движение по Y на несколько небольших шагов
-            const steps = 4;
-            const stepVy = player.vy / steps;
-            
-            for (let i = 0; i < steps; i++) {
-                player.y += stepVy;
-                
-                // Коллизия с платформами по Y на каждом шаге
-                for (let platform of platforms) {
-                    if (checkCollision(player, platform)) {
-                        if (stepVy > 0) { // Падаем вниз
-                            player.y = platform.y - PLAYER_SIZE.height;
-                            player.vy = 0;
-                            player.onGround = true;
-                        } else if (stepVy < 0) { // Прыгаем вверх
-                            player.y = platform.y + platform.height;
-                            player.vy = 0;
-                        }
-                        break; // Выходим из цикла платформ после коллизии
-                    }
+            let newY = player.y + dy;
+            let collisionY = false;
+            for (let wall of walls) {
+                if (checkCollision({ x: player.x, y: newY, width: PLAYER_SIZE, height: PLAYER_SIZE }, wall)) {
+                    collisionY = true;
+                    break;
                 }
             }
-            
-            // Проверка падения в лаву
-            for (let lava of lavaPits) {
-                if (checkCollision(player, lava)) {
-                    restartLevel();
-                    return;
-                }
+            if (!collisionY && newY >= 0 && newY <= CANVAS_HEIGHT - PLAYER_SIZE) {
+                player.y = newY;
             }
             
-            // Проверка столкновения с крабиками
-            for (let crab of crabs) {
-                if (checkCollision(player, { x: crab.x, y: crab.y, width: CRAB_SIZE.width, height: CRAB_SIZE.height })) {
-                    restartLevel();
-                    return;
-                }
+            if (!key.taken && checkCollision(
+                { x: player.x, y: player.y, width: PLAYER_SIZE, height: PLAYER_SIZE },
+                key
+            )) {
+                key.taken = true;
+                updateMessage();
             }
             
-            // Проверка достижения двери
-            if (checkCollision(player, door)) {
-                nextLevel();
-                return;
-            }
-            
-            // Падение за пределы экрана
-            if (player.y > CANVAS_HEIGHT) {
-                restartLevel();
+            if (key.taken && !door.open && checkCollision(
+                { x: player.x, y: player.y, width: PLAYER_SIZE, height: PLAYER_SIZE },
+                door
+            )) {
+                door.open = true;
+                won = true;
+                updateMessage();
             }
         }
         
-        // Проверка прямоугольной коллизии
         function checkCollision(rect1, rect2) {
             return rect1.x < rect2.x + rect2.width &&
                    rect1.x + rect1.width > rect2.x &&
@@ -304,195 +164,66 @@
                    rect1.y + rect1.height > rect2.y;
         }
 
-        // ============================================
-        // ДВИЖЕНИЕ КРАБИКОВ
-        // ============================================
-        function updateCrabs() {
-            for (let crab of crabs) {
-                crab.x += crab.direction * crab.speed;
-                
-                // Разворот на границах платформы
-                if (crab.x <= crab.startX || crab.x >= crab.endX) {
-                    crab.direction *= -1;
-                }
-            }
-        }
-        
-        // ============================================
-        // ПЕРЕЗАПУСК И СЛЕДУЮЩИЙ УРОВЕНЬ
-        // ============================================
-        function restartLevel() {
-            generateLevel();
-        }
-
-        function nextLevel() {
-            level++;
-            generateLevel();
-        }
-
         function updateMessage() {
             const messageEl = document.getElementById('message');
-            messageEl.textContent = 'Уровень: ' + level + ' | Доберись до двери!';
+            if (won) {
+                messageEl.textContent = '🎉 ПОБЕДА! Ты открыл дверь!';
+            } else if (key.taken) {
+                messageEl.textContent = 'Ключ у тебя! Иди к двери!';
+            } else {
+                messageEl.textContent = 'Найди золотой ключ!';
+            }
         }
 
-        // ============================================
-        // ОТРИСОВКА - ПЛАТФОРМЕР
-        // ============================================
         function draw() {
-            // Градиентный фон неба
-            const gradient = ctx.createLinearGradient(0, 0, 0, CANVAS_HEIGHT);
-            gradient.addColorStop(0, COLORS.SKY_TOP);
-            gradient.addColorStop(1, COLORS.SKY_BOTTOM);
-            ctx.fillStyle = gradient;
+            ctx.fillStyle = COLORS.FLOOR;
             ctx.fillRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
             
-            // Рисуем платформы
-            for (let platform of platforms) {
-                // Трава сверху
-                ctx.fillStyle = COLORS.PLATFORM_GRASS;
-                ctx.fillRect(platform.x, platform.y, platform.width, 5);
-                
-                // Земля платформы
-                ctx.fillStyle = COLORS.PLATFORM;
-                ctx.fillRect(platform.x, platform.y + 5, platform.width, platform.height - 5);
+            ctx.fillStyle = COLORS.WALL;
+            for (let wall of walls) {
+                ctx.fillRect(wall.x, wall.y, wall.width, wall.height);
             }
             
-            // Рисуем лаву
-            for (let lava of lavaPits) {
-                // Светящийся эффект
-                ctx.fillStyle = COLORS.LAVA_GLOW;
-                ctx.fillRect(lava.x - 2, lava.y - 2, lava.width + 4, lava.height + 4);
-                
-                // Основная лава
-                ctx.fillStyle = COLORS.LAVA;
-                ctx.fillRect(lava.x, lava.y, lava.width, lava.height);
-                
-                // Волны лавы (анимация)
-                ctx.fillStyle = '#FF8C00';
-                const waveOffset = Math.sin(Date.now() / 200) * 3;
-                ctx.fillRect(lava.x + 5, lava.y + waveOffset, lava.width - 10, 5);
-            }
-            
-            // Рисуем дверь
-            drawDoor();
-            
-            // Рисуем крабиков
-            for (let crab of crabs) {
-                drawCrab(crab);
-            }
-            
-            // Рисуем игрока
-            drawPlayer();
-        }
-        
-        // Рисование двери
-        function drawDoor() {
-            // Рама двери
-            ctx.fillStyle = COLORS.DOOR_FRAME;
+            ctx.fillStyle = door.open ? COLORS.DOOR_OPEN : COLORS.DOOR_LOCKED;
             ctx.fillRect(door.x, door.y, door.width, door.height);
             
-            // Панель двери
-            ctx.fillStyle = COLORS.DOOR_PANEL;
-            ctx.fillRect(door.x + 5, door.y + 5, door.width - 10, door.height - 10);
+            if (!door.open) {
+                ctx.fillStyle = '#FFD700';
+                ctx.beginPath();
+                ctx.arc(door.x + door.width - 10, door.y + door.height / 2, 5, 0, Math.PI * 2);
+                ctx.fill();
+            }
             
-            // Ручка двери
-            ctx.fillStyle = '#FFD700';
-            ctx.beginPath();
-            ctx.arc(door.x + door.width - 12, door.y + door.height / 2, 4, 0, Math.PI * 2);
-            ctx.fill();
+            if (!key.taken) {
+                ctx.fillStyle = COLORS.KEY;
+                ctx.fillRect(key.x, key.y + 6, 14, 8);
+                ctx.fillRect(key.x + 14, key.y + 4, 6, 12);
+                ctx.beginPath();
+                ctx.arc(key.x, key.y + 10, 6, 0, Math.PI * 2);
+                ctx.fill();
+            }
             
-            // Декоративные панели на двери
-            ctx.fillStyle = '#DEB887';
-            ctx.fillRect(door.x + 10, door.y + 10, door.width - 25, 20);
-            ctx.fillRect(door.x + 10, door.y + 35, door.width - 25, 20);
-        }
-        
-        // Рисование крабика
-        function drawCrab(crab) {
-            const x = crab.x;
-            const y = crab.y;
+            ctx.fillStyle = COLORS.PLAYER;
+            ctx.fillRect(player.x, player.y, PLAYER_SIZE, PLAYER_SIZE);
             
-            // Тело краба (овальное)
-            ctx.fillStyle = COLORS.CRAB_BODY;
-            ctx.beginPath();
-            ctx.ellipse(x + CRAB_SIZE.width / 2, y + CRAB_SIZE.height / 2, 
-                       CRAB_SIZE.width / 2, CRAB_SIZE.height / 2.5, 0, 0, Math.PI * 2);
-            ctx.fill();
-            
-            // Глаза
             ctx.fillStyle = 'white';
-            ctx.beginPath();
-            ctx.arc(x + CRAB_SIZE.width / 3, y + CRAB_SIZE.height / 3, 4, 0, Math.PI * 2);
-            ctx.arc(x + CRAB_SIZE.width * 2 / 3, y + CRAB_SIZE.height / 3, 4, 0, Math.PI * 2);
-            ctx.fill();
-            
+            ctx.fillRect(player.x + 5, player.y + 8, 8, 8);
+            ctx.fillRect(player.x + 17, player.y + 8, 8, 8);
             ctx.fillStyle = 'black';
-            ctx.beginPath();
-            ctx.arc(x + CRAB_SIZE.width / 3, y + CRAB_SIZE.height / 3, 2, 0, Math.PI * 2);
-            ctx.arc(x + CRAB_SIZE.width * 2 / 3, y + CRAB_SIZE.height / 3, 2, 0, Math.PI * 2);
-            ctx.fill();
+            ctx.fillRect(player.x + 7, player.y + 10, 4, 4);
+            ctx.fillRect(player.x + 19, player.y + 10, 4, 4);
             
-            // Клешни
-            ctx.fillStyle = COLORS.CRAB_LEGS;
-            if (crab.direction > 0) {
-                // Правая клешня впереди
-                ctx.fillRect(x - 5, y + CRAB_SIZE.height / 2 - 5, 10, 8);
-                ctx.fillRect(x + CRAB_SIZE.width - 5, y + CRAB_SIZE.height / 2 - 8, 10, 10);
-            } else {
-                // Левая клешня впереди
-                ctx.fillRect(x - 5, y + CRAB_SIZE.height / 2 - 8, 10, 10);
-                ctx.fillRect(x + CRAB_SIZE.width - 5, y + CRAB_SIZE.height / 2 - 5, 10, 8);
+            if (key.taken && !won) {
+                ctx.fillStyle = COLORS.KEY;
+                ctx.beginPath();
+                ctx.arc(player.x + PLAYER_SIZE / 2, player.y - 10, 8, 0, Math.PI * 2);
+                ctx.fill();
             }
-            
-            // Ноги краба
-            ctx.fillStyle = COLORS.CRAB_LEGS;
-            for (let i = 0; i < 4; i++) {
-                const legY = y + CRAB_SIZE.height / 2 + i * 4;
-                ctx.fillRect(x - 3, legY, 6, 3);
-                ctx.fillRect(x + CRAB_SIZE.width - 3, legY, 6, 3);
-            }
-        }
-        
-        // Рисование игрока
-        function drawPlayer() {
-            const x = player.x;
-            const y = player.y;
-            
-            // Тело
-            ctx.fillStyle = COLORS.PLAYER_BODY;
-            ctx.fillRect(x + 5, y + 20, PLAYER_SIZE.width - 10, PLAYER_SIZE.height - 25);
-            
-            // Голова
-            ctx.fillStyle = COLORS.PLAYER_HEAD;
-            ctx.beginPath();
-            ctx.arc(x + PLAYER_SIZE.width / 2, y + 12, 12, 0, Math.PI * 2);
-            ctx.fill();
-            
-            // Глаза
-            ctx.fillStyle = 'black';
-            const eyeOffset = player.facingRight ? 3 : -3;
-            ctx.beginPath();
-            ctx.arc(x + PLAYER_SIZE.width / 2 + eyeOffset + 4, y + 10, 2, 0, Math.PI * 2);
-            ctx.fill();
-            
-            // Ноги
-            ctx.fillStyle = '#4169E1';
-            ctx.fillRect(x + 8, y + PLAYER_SIZE.height - 12, 8, 12);
-            ctx.fillRect(x + PLAYER_SIZE.width - 16, y + PLAYER_SIZE.height - 12, 8, 12);
         }
 
-        // ============================================
-        // ИГРОВОЙ ЦИКЛ
-        // ============================================
-        function gameLoop(timestamp) {
-            // Обновление физики
-            updatePlayer();
-            updateCrabs();
-            
-            // Отрисовка
+        function gameLoop() {
+            update();
             draw();
-            
-            // Продолжаем цикл
             requestAnimationFrame(gameLoop);
         }
     </script>
