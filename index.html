@@ -8,29 +8,43 @@
         body {
             margin: 0;
             padding: 20px;
-            background-color: #2d2d2d;
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
             color: white;
-            font-family: Arial, sans-serif;
+            font-family: 'Segoe UI', Arial, sans-serif;
             display: flex;
             flex-direction: column;
             align-items: center;
+            min-height: 100vh;
         }
         canvas {
-            border: 3px solid #555;
-            background: #3a3a3a;
-            box-shadow: 0 0 20px rgba(0,0,0,0.5);
+            border: 4px solid #e94560;
+            background: #2d2d44;
+            box-shadow: 0 0 30px rgba(233, 69, 96, 0.4), 0 10px 40px rgba(0,0,0,0.6);
+            border-radius: 8px;
         }
         #ui {
-            margin-bottom: 10px;
+            margin-bottom: 15px;
             text-align: center;
+            background: rgba(255, 255, 255, 0.1);
+            padding: 15px 30px;
+            border-radius: 10px;
+            backdrop-filter: blur(10px);
         }
         #message {
-            margin-top: 10px;
-            font-size: 20px;
+            margin-top: 15px;
+            font-size: 24px;
             color: #ffd700;
+            text-shadow: 0 0 10px rgba(255, 215, 0, 0.5);
+            font-weight: bold;
         }
         h1 {
-            color: #87CEEB;
+            color: #e94560;
+            margin: 0 0 10px 0;
+            text-shadow: 0 0 20px rgba(233, 69, 96, 0.5);
+        }
+        p {
+            margin: 5px 0;
+            opacity: 0.9;
         }
     </style>
 </head>
@@ -49,12 +63,12 @@
         const PLAYER_SIZE = 30;
         
         const COLORS = {
-            FLOOR: '#3a3a3a',
-            WALL: '#555555',
-            PLAYER: '#4CAF50',
-            KEY: '#FFD700',
-            DOOR_LOCKED: '#8B4513',
-            DOOR_OPEN: '#654321'
+            FLOOR: '#2d2d44',
+            WALL: '#e94560',
+            PLAYER: '#00ff88',
+            KEY: '#ffd700',
+            DOOR_LOCKED: '#ff6b6b',
+            DOOR_OPEN: '#4ecdc4'
         };
 
         let canvas, ctx;
@@ -176,48 +190,182 @@
         }
 
         function draw() {
+            // Рисуем пол с текстурой плитки
             ctx.fillStyle = COLORS.FLOOR;
             ctx.fillRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
             
-            ctx.fillStyle = COLORS.WALL;
-            for (let wall of walls) {
-                ctx.fillRect(wall.x, wall.y, wall.width, wall.height);
+            // Рисуем сетку пола (эффект плитки)
+            ctx.strokeStyle = 'rgba(255, 255, 255, 0.05)';
+            ctx.lineWidth = 1;
+            const tileSize = 40;
+            for (let x = 0; x < CANVAS_WIDTH; x += tileSize) {
+                ctx.beginPath();
+                ctx.moveTo(x, 0);
+                ctx.lineTo(x, CANVAS_HEIGHT);
+                ctx.stroke();
+            }
+            for (let y = 0; y < CANVAS_HEIGHT; y += tileSize) {
+                ctx.beginPath();
+                ctx.moveTo(0, y);
+                ctx.lineTo(CANVAS_WIDTH, y);
+                ctx.stroke();
             }
             
-            ctx.fillStyle = door.open ? COLORS.DOOR_OPEN : COLORS.DOOR_LOCKED;
-            ctx.fillRect(door.x, door.y, door.width, door.height);
+            // Рисуем стены с эффектом объема
+            for (let wall of walls) {
+                // Тень стены
+                ctx.fillStyle = 'rgba(0, 0, 0, 0.3)';
+                ctx.fillRect(wall.x + 4, wall.y + 4, wall.width, wall.height);
+                
+                // Основная часть стены
+                ctx.fillStyle = COLORS.WALL;
+                ctx.fillRect(wall.x, wall.y, wall.width, wall.height);
+                
+                // Блик сверху
+                ctx.fillStyle = 'rgba(255, 255, 255, 0.2)';
+                ctx.fillRect(wall.x, wall.y, wall.width, 4);
+                
+                // Декоративные элементы на стенах
+                ctx.fillStyle = 'rgba(0, 0, 0, 0.2)';
+                const brickHeight = 8;
+                for (let by = wall.y; by < wall.y + wall.height; by += brickHeight * 2) {
+                    ctx.fillRect(wall.x + 2, by + 2, wall.width - 4, 2);
+                }
+            }
             
-            if (!door.open) {
+            // Рисуем дверь
+            if (door.open) {
+                // Открытая дверь - темный проход
+                ctx.fillStyle = '#1a1a2e';
+                ctx.fillRect(door.x, door.y, door.width, door.height);
+                // Свет из прохода
+                ctx.fillStyle = 'rgba(78, 205, 196, 0.3)';
+                ctx.fillRect(door.x + 5, door.y + 5, door.width - 10, door.height - 10);
+            } else {
+                // Закрытая дверь с деталями
+                // Тень
+                ctx.fillStyle = 'rgba(0, 0, 0, 0.3)';
+                ctx.fillRect(door.x + 3, door.y + 3, door.width, door.height);
+                
+                // Основная дверь
+                ctx.fillStyle = COLORS.DOOR_LOCKED;
+                ctx.fillRect(door.x, door.y, door.width, door.height);
+                
+                // Рама двери
+                ctx.strokeStyle = '#c0392b';
+                ctx.lineWidth = 3;
+                ctx.strokeRect(door.x + 2, door.y + 2, door.width - 4, door.height - 4);
+                
+                // Панели на двери
+                ctx.fillStyle = 'rgba(0, 0, 0, 0.2)';
+                ctx.fillRect(door.x + 5, door.y + 8, door.width - 10, 18);
+                ctx.fillRect(door.x + 5, door.y + 32, door.width - 10, 18);
+                
+                // Золотая ручка/замок
                 ctx.fillStyle = '#FFD700';
                 ctx.beginPath();
-                ctx.arc(door.x + door.width - 10, door.y + door.height / 2, 5, 0, Math.PI * 2);
+                ctx.arc(door.x + door.width - 12, door.y + door.height / 2, 6, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.fillStyle = '#b8860b';
+                ctx.beginPath();
+                ctx.arc(door.x + door.width - 12, door.y + door.height / 2, 3, 0, Math.PI * 2);
                 ctx.fill();
             }
             
+            // Рисуем ключ
             if (!key.taken) {
+                // Свечение вокруг ключа
+                ctx.fillStyle = 'rgba(255, 215, 0, 0.3)';
+                ctx.beginPath();
+                ctx.arc(key.x + 10, key.y + 10, 18, 0, Math.PI * 2);
+                ctx.fill();
+                
+                // Основная часть ключа
                 ctx.fillStyle = COLORS.KEY;
                 ctx.fillRect(key.x, key.y + 6, 14, 8);
                 ctx.fillRect(key.x + 14, key.y + 4, 6, 12);
                 ctx.beginPath();
                 ctx.arc(key.x, key.y + 10, 6, 0, Math.PI * 2);
                 ctx.fill();
+                
+                // Блик на ключе
+                ctx.fillStyle = 'rgba(255, 255, 255, 0.6)';
+                ctx.beginPath();
+                ctx.arc(key.x - 2, key.y + 8, 3, 0, Math.PI * 2);
+                ctx.fill();
             }
             
+            // Рисуем игрока
+            // Тень игрока
+            ctx.fillStyle = 'rgba(0, 0, 0, 0.4)';
+            ctx.beginPath();
+            ctx.ellipse(player.x + PLAYER_SIZE / 2, player.y + PLAYER_SIZE + 3, PLAYER_SIZE / 2, 6, 0, 0, Math.PI * 2);
+            ctx.fill();
+            
+            // Тело игрока (вид сверху)
             ctx.fillStyle = COLORS.PLAYER;
-            ctx.fillRect(player.x, player.y, PLAYER_SIZE, PLAYER_SIZE);
+            ctx.beginPath();
+            ctx.arc(player.x + PLAYER_SIZE / 2, player.y + PLAYER_SIZE / 2, PLAYER_SIZE / 2, 0, Math.PI * 2);
+            ctx.fill();
             
+            // Обводка игрока
+            ctx.strokeStyle = '#00cc6a';
+            ctx.lineWidth = 2;
+            ctx.stroke();
+            
+            // Глаза (вид сверху)
             ctx.fillStyle = 'white';
-            ctx.fillRect(player.x + 5, player.y + 8, 8, 8);
-            ctx.fillRect(player.x + 17, player.y + 8, 8, 8);
-            ctx.fillStyle = 'black';
-            ctx.fillRect(player.x + 7, player.y + 10, 4, 4);
-            ctx.fillRect(player.x + 19, player.y + 10, 4, 4);
+            ctx.beginPath();
+            ctx.arc(player.x + PLAYER_SIZE / 2 - 6, player.y + PLAYER_SIZE / 2 - 2, 5, 0, Math.PI * 2);
+            ctx.arc(player.x + PLAYER_SIZE / 2 + 6, player.y + PLAYER_SIZE / 2 - 2, 5, 0, Math.PI * 2);
+            ctx.fill();
             
+            // Зрачки
+            ctx.fillStyle = 'black';
+            ctx.beginPath();
+            ctx.arc(player.x + PLAYER_SIZE / 2 - 5, player.y + PLAYER_SIZE / 2 - 2, 3, 0, Math.PI * 2);
+            ctx.arc(player.x + PLAYER_SIZE / 2 + 7, player.y + PLAYER_SIZE / 2 - 2, 3, 0, Math.PI * 2);
+            ctx.fill();
+            
+            // Блик в глазах
+            ctx.fillStyle = 'white';
+            ctx.beginPath();
+            ctx.arc(player.x + PLAYER_SIZE / 2 - 4, player.y + PLAYER_SIZE / 2 - 4, 1.5, 0, Math.PI * 2);
+            ctx.arc(player.x + PLAYER_SIZE / 2 + 8, player.y + PLAYER_SIZE / 2 - 4, 1.5, 0, Math.PI * 2);
+            ctx.fill();
+            
+            // Если ключ взят - рисуем его у игрока
             if (key.taken && !won) {
                 ctx.fillStyle = COLORS.KEY;
+                // Свечение
+                ctx.shadowColor = COLORS.KEY;
+                ctx.shadowBlur = 10;
                 ctx.beginPath();
-                ctx.arc(player.x + PLAYER_SIZE / 2, player.y - 10, 8, 0, Math.PI * 2);
+                ctx.arc(player.x + PLAYER_SIZE / 2, player.y - 8, 10, 0, Math.PI * 2);
                 ctx.fill();
+                ctx.shadowBlur = 0;
+                
+                // Детали ключа
+                ctx.fillStyle = '#b8860b';
+                ctx.beginPath();
+                ctx.arc(player.x + PLAYER_SIZE / 2, player.y - 8, 5, 0, Math.PI * 2);
+                ctx.fill();
+            }
+            
+            // Эффект победы
+            if (won) {
+                ctx.fillStyle = 'rgba(255, 215, 0, 0.1)';
+                ctx.fillRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
+                
+                // Искры
+                for (let i = 0; i < 20; i++) {
+                    const sparkX = Math.random() * CANVAS_WIDTH;
+                    const sparkY = Math.random() * CANVAS_HEIGHT;
+                    ctx.fillStyle = `hsl(${Math.random() * 60 + 40}, 100%, 50%)`;
+                    ctx.beginPath();
+                    ctx.arc(sparkX, sparkY, 3, 0, Math.PI * 2);
+                    ctx.fill();
+                }
             }
         }
 
