@@ -51,7 +51,8 @@
 <body>
     <div id="ui">
         <h1>🔑 КЛЮЧ И ДВЕРЬ 🚪</h1>
-        <p>Управление: Стрелки или WASD | Возьми ключ и открой дверь!</p>
+        <p>Управление: Стрелки или WASD | Возьми ключ и открой дверь! Избегай монстров!</p>
+        <p id="levelInfo">Уровень: 1</p>
     </div>
     <canvas id="gameCanvas"></canvas>
     <div id="message">Найди ключ!</div>
@@ -68,7 +69,8 @@
             PLAYER: '#00ff88',
             KEY: '#ffd700',
             DOOR_LOCKED: '#ff6b6b',
-            DOOR_OPEN: '#4ecdc4'
+            DOOR_OPEN: '#4ecdc4',
+            MONSTER: '#ff00ff'
         };
 
         let canvas, ctx;
@@ -76,8 +78,11 @@
         let key = { x: 0, y: 0, width: 20, height: 20, taken: false };
         let door = { x: 0, y: 0, width: 40, height: 60, open: false };
         let walls = [];
+        let monsters = [];
         let keysPressed = {};
         let won = false;
+        let currentLevel = 1;
+        let maxLevels = 5;
         
         window.onload = function() {
             canvas = document.getElementById('gameCanvas');
@@ -92,27 +97,124 @@
             });
             document.addEventListener('keyup', (e) => keysPressed[e.code] = false);
             
-            initLevel();
+            initLevel(currentLevel);
             gameLoop();
         };
 
-        function initLevel() {
-            player.x = 50;
-            player.y = 50;
+        function getLevelData(level) {
+            const levels = [
+                // Уровень 1 - простой
+                {
+                    playerStart: { x: 50, y: 50 },
+                    keyPos: { x: CANVAS_WIDTH - 80, y: CANVAS_HEIGHT - 80 },
+                    doorPos: { x: CANVAS_WIDTH - 100, y: 50 },
+                    walls: [
+                        { x: 200, y: 0, width: 20, height: 400 },
+                        { x: 400, y: 200, width: 20, height: 400 },
+                        { x: 600, y: 0, width: 20, height: 350 },
+                        { x: 150, y: 450, width: 300, height: 20 }
+                    ],
+                    monsters: []
+                },
+                // Уровень 2 - с одним монстром
+                {
+                    playerStart: { x: 50, y: 50 },
+                    keyPos: { x: CANVAS_WIDTH - 80, y: 80 },
+                    doorPos: { x: 80, y: CANVAS_HEIGHT - 100 },
+                    walls: [
+                        { x: 150, y: 0, width: 20, height: 300 },
+                        { x: 300, y: 150, width: 350, height: 20 },
+                        { x: 500, y: 300, width: 20, height: 300 },
+                        { x: 200, y: 450, width: 250, height: 20 }
+                    ],
+                    monsters: [
+                        { x: 400, y: 200, width: 35, height: 35, speedX: 2, speedY: 0, minX: 250, maxX: 550, minY: 180, maxY: 280 }
+                    ]
+                },
+                // Уровень 3 - больше стен и два монстра
+                {
+                    playerStart: { x: 50, y: 300 },
+                    keyPos: { x: CANVAS_WIDTH - 80, y: CANVAS_HEIGHT - 80 },
+                    doorPos: { x: CANVAS_WIDTH - 100, y: 50 },
+                    walls: [
+                        { x: 150, y: 0, width: 20, height: 250 },
+                        { x: 150, y: 350, width: 20, height: 250 },
+                        { x: 350, y: 100, width: 20, height: 400 },
+                        { x: 550, y: 0, width: 20, height: 250 },
+                        { x: 550, y: 350, width: 20, height: 250 },
+                        { x: 200, y: 280, width: 130, height: 20 },
+                        { x: 400, y: 300, width: 130, height: 20 }
+                    ],
+                    monsters: [
+                        { x: 200, y: 100, width: 35, height: 35, speedX: 0, speedY: 2.5, minX: 180, maxX: 320, minY: 50, maxY: 250 },
+                        { x: 600, y: 400, width: 35, height: 35, speedX: 3, speedY: 0, minX: 580, maxX: 750, minY: 380, maxY: 480 }
+                    ]
+                },
+                // Уровень 4 - лабиринт с тремя монстрами
+                {
+                    playerStart: { x: 50, y: 50 },
+                    keyPos: { x: CANVAS_WIDTH - 80, y: CANVAS_HEIGHT - 80 },
+                    doorPos: { x: 50, y: CANVAS_HEIGHT - 100 },
+                    walls: [
+                        { x: 120, y: 0, width: 20, height: 400 },
+                        { x: 240, y: 200, width: 20, height: 400 },
+                        { x: 360, y: 0, width: 20, height: 350 },
+                        { x: 480, y: 150, width: 20, height: 450 },
+                        { x: 600, y: 0, width: 20, height: 300 },
+                        { x: 720, y: 250, width: 20, height: 350 },
+                        { x: 100, y: 500, width: 200, height: 20 },
+                        { x: 400, y: 80, width: 150, height: 20 }
+                    ],
+                    monsters: [
+                        { x: 180, y: 50, width: 35, height: 35, speedX: 0, speedY: 2, minX: 150, maxX: 220, minY: 30, maxY: 180 },
+                        { x: 400, y: 400, width: 35, height: 35, speedX: 2.5, speedY: 0, minX: 380, maxX: 460, minY: 380, maxY: 550 },
+                        { x: 650, y: 150, width: 35, height: 35, speedX: 0, speedY: 3, minX: 620, maxX: 700, minY: 100, maxY: 230 }
+                    ]
+                },
+                // Уровень 5 - сложный с четырьмя монстрами
+                {
+                    playerStart: { x: 50, y: 300 },
+                    keyPos: { x: CANVAS_WIDTH / 2 - 10, y: CANVAS_HEIGHT / 2 - 10 },
+                    doorPos: { x: CANVAS_WIDTH - 100, y: CANVAS_HEIGHT - 100 },
+                    walls: [
+                        { x: 150, y: 0, width: 20, height: 200 },
+                        { x: 150, y: 400, width: 20, height: 200 },
+                        { x: 300, y: 150, width: 20, height: 300 },
+                        { x: 450, y: 0, width: 20, height: 250 },
+                        { x: 450, y: 350, width: 20, height: 250 },
+                        { x: 600, y: 200, width: 20, height: 250 },
+                        { x: 200, y: 280, width: 80, height: 20 },
+                        { x: 500, y: 280, width: 80, height: 20 },
+                        { x: 350, y: 450, width: 150, height: 20 }
+                    ],
+                    monsters: [
+                        { x: 100, y: 100, width: 35, height: 35, speedX: 2, speedY: 0, minX: 80, maxX: 280, minY: 80, maxY: 180 },
+                        { x: 350, y: 50, width: 35, height: 35, speedX: 0, speedY: 2.5, minX: 330, maxX: 430, minY: 30, maxY: 130 },
+                        { x: 650, y: 300, width: 35, height: 35, speedX: 3, speedY: 0, minX: 620, maxX: 750, minY: 280, maxY: 380 },
+                        { x: 250, y: 500, width: 35, height: 35, speedX: 0, speedY: 2, minX: 230, maxX: 330, minY: 480, maxY: 560 }
+                    ]
+                }
+            ];
+            return levels[(level - 1) % levels.length];
+        }
+
+        function initLevel(level) {
+            const levelData = getLevelData(level);
+            
+            player.x = levelData.playerStart.x;
+            player.y = levelData.playerStart.y;
             key.taken = false;
             door.open = false;
             won = false;
-            key.x = CANVAS_WIDTH - 80;
-            key.y = CANVAS_HEIGHT - 80;
-            door.x = CANVAS_WIDTH - 100;
-            door.y = 50;
-            walls = [
-                { x: 200, y: 0, width: 20, height: 400 },
-                { x: 400, y: 200, width: 20, height: 400 },
-                { x: 600, y: 0, width: 20, height: 350 },
-                { x: 150, y: 450, width: 300, height: 20 }
-            ];
+            key.x = levelData.keyPos.x;
+            key.y = levelData.keyPos.y;
+            door.x = levelData.doorPos.x;
+            door.y = levelData.doorPos.y;
+            walls = levelData.walls;
+            monsters = JSON.parse(JSON.stringify(levelData.monsters));
+            
             updateMessage();
+            updateLevelInfo();
         }
 
         function update() {
@@ -167,7 +269,39 @@
             )) {
                 door.open = true;
                 won = true;
-                updateMessage();
+                setTimeout(() => {
+                    currentLevel++;
+                    if (currentLevel > maxLevels) {
+                        currentLevel = 1;
+                    }
+                    initLevel(currentLevel);
+                }, 1500);
+            }
+
+            // Обновление монстров и проверка столкновений
+            for (let monster of monsters) {
+                // Движение монстра
+                monster.x += monster.speedX;
+                monster.y += monster.speedY;
+                
+                // Патрулирование в пределах зоны
+                if (monster.x <= monster.minX || monster.x >= monster.maxX) {
+                    monster.speedX *= -1;
+                }
+                if (monster.y <= monster.minY || monster.y >= monster.maxY) {
+                    monster.speedY *= -1;
+                }
+                
+                // Проверка столкновения с игроком
+                if (checkCollision(
+                    { x: player.x, y: player.y, width: PLAYER_SIZE, height: PLAYER_SIZE },
+                    monster
+                )) {
+                    // Игрок пойман - начать уровень заново
+                    initLevel(currentLevel);
+                    updateMessage();
+                    return;
+                }
             }
         }
         
@@ -181,12 +315,17 @@
         function updateMessage() {
             const messageEl = document.getElementById('message');
             if (won) {
-                messageEl.textContent = '🎉 ПОБЕДА! Ты открыл дверь!';
+                messageEl.textContent = '🎉 ПОБЕДА! Переход на следующий уровень...';
             } else if (key.taken) {
                 messageEl.textContent = 'Ключ у тебя! Иди к двери!';
             } else {
                 messageEl.textContent = 'Найди золотой ключ!';
             }
+        }
+
+        function updateLevelInfo() {
+            const levelInfoEl = document.getElementById('levelInfo');
+            levelInfoEl.textContent = `Уровень: ${currentLevel} из ${maxLevels}`;
         }
 
         function draw() {
@@ -292,6 +431,60 @@
                 ctx.fillStyle = 'rgba(255, 255, 255, 0.6)';
                 ctx.beginPath();
                 ctx.arc(key.x - 2, key.y + 8, 3, 0, Math.PI * 2);
+                ctx.fill();
+            }
+            
+            // Рисуем монстров
+            for (let monster of monsters) {
+                // Тень монстра
+                ctx.fillStyle = 'rgba(0, 0, 0, 0.4)';
+                ctx.beginPath();
+                ctx.ellipse(monster.x + monster.width / 2, monster.y + monster.height + 3, monster.width / 2, 6, 0, 0, Math.PI * 2);
+                ctx.fill();
+                
+                // Тело монстра (вид сверху) - злой красный/фиолетовый круг
+                ctx.fillStyle = COLORS.MONSTER;
+                ctx.beginPath();
+                ctx.arc(monster.x + monster.width / 2, monster.y + monster.height / 2, monster.width / 2, 0, Math.PI * 2);
+                ctx.fill();
+                
+                // Обводка монстра
+                ctx.strokeStyle = '#cc00cc';
+                ctx.lineWidth = 2;
+                ctx.stroke();
+                
+                // Злые глаза монстра
+                ctx.fillStyle = '#ff0000';
+                ctx.beginPath();
+                ctx.arc(monster.x + monster.width / 2 - 8, monster.y + monster.height / 2 - 3, 6, 0, Math.PI * 2);
+                ctx.arc(monster.x + monster.width / 2 + 8, monster.y + monster.height / 2 - 3, 6, 0, Math.PI * 2);
+                ctx.fill();
+                
+                // Зрачки монстра
+                ctx.fillStyle = '#ffff00';
+                ctx.beginPath();
+                ctx.arc(monster.x + monster.width / 2 - 7, monster.y + monster.height / 2 - 2, 3, 0, Math.PI * 2);
+                ctx.arc(monster.x + monster.width / 2 + 9, monster.y + monster.height / 2 - 2, 3, 0, Math.PI * 2);
+                ctx.fill();
+                
+                // Злой рот
+                ctx.strokeStyle = '#ff0000';
+                ctx.lineWidth = 3;
+                ctx.beginPath();
+                ctx.arc(monster.x + monster.width / 2, monster.y + monster.height / 2 + 8, 10, 0.2 * Math.PI, 0.8 * Math.PI);
+                ctx.stroke();
+                
+                // Шипы/рога
+                ctx.fillStyle = '#ff0066';
+                ctx.beginPath();
+                ctx.moveTo(monster.x + monster.width / 2 - 10, monster.y + 5);
+                ctx.lineTo(monster.x + monster.width / 2 - 5, monster.y - 5);
+                ctx.lineTo(monster.x + monster.width / 2, monster.y + 5);
+                ctx.fill();
+                ctx.beginPath();
+                ctx.moveTo(monster.x + monster.width / 2 + 10, monster.y + 5);
+                ctx.lineTo(monster.x + monster.width / 2 + 5, monster.y - 5);
+                ctx.lineTo(monster.x + monster.width / 2, monster.y + 5);
                 ctx.fill();
             }
             
