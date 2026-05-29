@@ -3,12 +3,12 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Бесконечная головоломка</title>
+    <title>Открой Дверь</title>
     <style>
         body {
             margin: 0;
             padding: 20px;
-            background-color: #222;
+            background-color: #1a1a2e;
             color: white;
             font-family: Arial, sans-serif;
             display: flex;
@@ -16,8 +16,9 @@
             align-items: center;
         }
         canvas {
-            border: 2px solid #555;
-            background-color: #333;
+            border: 3px solid #4a4a6a;
+            background: linear-gradient(to bottom, #87CEEB, #5BA3D0);
+            box-shadow: 0 0 20px rgba(135, 206, 235, 0.5);
         }
         #ui {
             margin-bottom: 10px;
@@ -25,36 +26,50 @@
         }
         #message {
             margin-top: 10px;
-            font-size: 18px;
+            font-size: 20px;
             color: #ffd700;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.5);
+        }
+        h1 {
+            color: #87CEEB;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.5);
         }
     </style>
 </head>
 <body>
     <div id="ui">
-        <h1>Уровень: <span id="level">1</span></h1>
-        <p>Управление: WASD или Стрелки</p>
+        <h1>🚪 ОТКРОЙ ДВЕРЬ 🦀</h1>
+        <p>Управление: A/D или Стрелки Влево/Вправо | Пробел - Прыжок</p>
     </div>
     <canvas id="gameCanvas"></canvas>
-    <div id="message">Собери ключ!</div>
+    <div id="message">Доберись до двери!</div>
 
     <script>
         // ============================================
-        // КОНФИГУРАЦИЯ ИГРЫ
+        // КОНФИГУРАЦИЯ ИГРЫ - ПЛАТФОРМЕР С БОКОВЫМ ВИДОМ
         // ============================================
-        const TILE_SIZE = 50;        // Размер клетки в пикселях
-        const GRID_WIDTH = 15;       // Ширина сетки в клетках
-        const GRID_HEIGHT = 12;      // Высота сетки в клетках
-        const MONSTER_MOVE_INTERVAL = 500; // Монстры двигаются каждые 0.5 секунды (500 мс)
+        const CANVAS_WIDTH = 900;
+        const CANVAS_HEIGHT = 500;
+        const GRAVITY = 0.6;
+        const JUMP_FORCE = -14;
+        const MOVE_SPEED = 5;
+        const PLAYER_SIZE = { width: 35, height: 50 };
+        const CRAB_SIZE = { width: 40, height: 30 };
         
         // Цвета объектов
         const COLORS = {
-            PLAYER: '#00ff00',   // Зелёный
-            MONSTER: '#ff0000',  // Красный
-            KEY: '#ffff00',      // Жёлтый
-            DOOR: '#0000ff',     // Синий
-            PIT: '#000000',      // Чёрный (пропасть)
-            FLOOR: '#333333'     // Тёмно-серый (пол)
+            SKY_TOP: '#87CEEB',      // Голубое небо (верх)
+            SKY_BOTTOM: '#5BA3D0',   // Голубое небо (низ)
+            PLAYER_BODY: '#FFB347',  // Оранжевый человечек
+            PLAYER_HEAD: '#FFE4C4',  // Светло-бежевая голова
+            CRAB_BODY: '#FF6B6B',    // Красный крабик
+            CRAB_LEGS: '#FF4747',    // Ноги краба
+            DOOR_FRAME: '#8B4513',   // Коричневая дверь
+            DOOR_PANEL: '#DEB887',   // Светлая панель двери
+            PLATFORM: '#654321',     // Коричневая платформа
+            PLATFORM_GRASS: '#228B22', // Трава на платформе
+            LAVA: '#FF4500',         // Оранжевая лава
+            LAVA_GLOW: '#FF6347'     // Светящаяся лава
         };
 
         // ============================================
@@ -62,15 +77,20 @@
         // ============================================
         let canvas, ctx;
         let level = 1;
-        let player = { x: 0, y: 0 };
-        let key = { x: 0, y: 0, collected: false };
-        let door = { x: 0, y: 0 };
-        let monsters = [];       // Массив монстров {x, y}
-        let pits = [];           // Массив пропастей {x, y}
-        let hasKey = false;
-        let monsterMoveTimer = 0;
-        let lastTime = 0;
-
+        let player = { 
+            x: 50, 
+            y: 300, 
+            vx: 0, 
+            vy: 0, 
+            onGround: false,
+            facingRight: true
+        };
+        let door = { x: 0, y: 0, width: 50, height: 70 };
+        let crabs = [];          // Массив крабиков-монстров
+        let platforms = [];      // Массив платформ {x, y, width, height}
+        let lavaPits = [];       // Массив лавовых пропастей {x, y, width, height}
+        let keys = {};           // Состояние клавиш
+        
         // ============================================
         // ИНИЦИАЛИЗАЦИЯ
         // ============================================
@@ -78,306 +98,217 @@
             canvas = document.getElementById('gameCanvas');
             ctx = canvas.getContext('2d');
             
-            // Устанавливаем размер канваса
-            canvas.width = GRID_WIDTH * TILE_SIZE;
-            canvas.height = GRID_HEIGHT * TILE_SIZE;
+            canvas.width = CANVAS_WIDTH;
+            canvas.height = CANVAS_HEIGHT;
             
-            // Обработчик нажатий клавиш
-            document.addEventListener('keydown', handleKeyPress);
+            document.addEventListener('keydown', (e) => {
+                keys[e.code] = true;
+                if(['Space', 'ArrowUp', 'ArrowDown'].includes(e.code)) e.preventDefault();
+            });
+            document.addEventListener('keyup', (e) => keys[e.code] = false);
             
-            // Запуск игрового цикла
             requestAnimationFrame(gameLoop);
-            
-            // Генерация первого уровня
             generateLevel();
         };
 
         // ============================================
-        // ГЕНЕРАЦИЯ УРОВНЯ
+        // ГЕНЕРАЦИЯ УРОВНЯ - ПЛАТФОРМЕР
         // ============================================
         function generateLevel() {
-            // Сброс состояния
-            hasKey = false;
-            key.collected = false;
-            monsters = [];
-            pits = [];
+            // Сброс состояния игрока
+            player.x = 50;
+            player.y = 300;
+            player.vx = 0;
+            player.vy = 0;
+            player.onGround = false;
             
-            // Количество препятствий увеличивается с уровнем
-            const numMonsters = level;           // +1 монстр каждый уровень
-            const numPits = 2 + (level - 1) * 2; // +2 пропасти каждый уровень
+            platforms = [];
+            crabs = [];
+            lavaPits = [];
             
-            // Создаём пустую сетку (все клетки проходимы)
-            let grid = [];
-            for (let y = 0; y < GRID_HEIGHT; y++) {
-                grid[y] = [];
-                for (let x = 0; x < GRID_WIDTH; x++) {
-                    grid[y][x] = 'floor';
-                }
-            }
+            // Базовая платформа (земля) с разрывами для лавы
+            const groundY = CANVAS_HEIGHT - 40;
             
-            // Размещаем игрока в случайной позиции (но не слишком близко к краю)
-            player.x = Math.floor(Math.random() * (GRID_WIDTH - 4)) + 2;
-            player.y = Math.floor(Math.random() * (GRID_HEIGHT - 4)) + 2;
-            grid[player.y][player.x] = 'player';
+            // Создаём платформы
+            // Стартовая платформа
+            platforms.push({ x: 0, y: groundY, width: 200, height: 40 });
             
-            // Функция для проверки доступности клетки
-            function isValidCell(x, y) {
-                return x >= 0 && x < GRID_WIDTH && 
-                       y >= 0 && y < GRID_HEIGHT && 
-                       grid[y][x] === 'floor' &&
-                       !(x === player.x && y === player.y);
-            }
+            // Платформы в середине с лавами между ними
+            let currentX = 250;
+            const numPlatforms = 3 + level; // Больше платформ с каждым уровнем
             
-            // Размещаем пропасти
-            let placedPits = 0;
-            while (placedPits < numPits) {
-                let x = Math.floor(Math.random() * GRID_WIDTH);
-                let y = Math.floor(Math.random() * GRID_HEIGHT);
+            for (let i = 0; i < numPlatforms; i++) {
+                const platformWidth = 100 + Math.random() * 80;
+                const gapSize = 60 + Math.random() * 50; // Пропастей с лавой
                 
-                if (isValidCell(x, y)) {
-                    // Не размещать пропасть рядом с игроком (стартовая зона безопасна)
-                    if (Math.abs(x - player.x) + Math.abs(y - player.y) > 2) {
-                        grid[y][x] = 'pit';
-                        pits.push({ x, y });
-                        placedPits++;
-                    }
+                // Лава под платформой
+                if (i > 0) {
+                    lavaPits.push({ 
+                        x: currentX - gapSize + 20, 
+                        y: groundY - 10, 
+                        width: gapSize - 20, 
+                        height: 50 
+                    });
                 }
-            }
-            
-            // Размещаем монстров
-            let placedMonsters = 0;
-            while (placedMonsters < numMonsters) {
-                let x = Math.floor(Math.random() * GRID_WIDTH);
-                let y = Math.floor(Math.random() * GRID_HEIGHT);
                 
-                if (isValidCell(x, y)) {
-                    // Не размещать монстра слишком близко к игроку
-                    if (Math.abs(x - player.x) + Math.abs(y - player.y) > 4) {
-                        grid[y][x] = 'monster';
-                        monsters.push({ x, y });
-                        placedMonsters++;
-                    }
-                }
-            }
-            
-            // Размещаем ключ (должен быть достижим)
-            let keyPlaced = false;
-            while (!keyPlaced) {
-                let x = Math.floor(Math.random() * GRID_WIDTH);
-                let y = Math.floor(Math.random() * GRID_HEIGHT);
+                // Платформа
+                platforms.push({ 
+                    x: currentX, 
+                    y: groundY, 
+                    width: platformWidth, 
+                    height: 40 
+                });
                 
-                if (isValidCell(x, y)) {
-                    // Проверяем, что ключ не в тупике (простая эвристика: есть хотя бы 2 соседних пола)
-                    let neighbors = 0;
-                    if (x > 0 && grid[y][x-1] === 'floor') neighbors++;
-                    if (x < GRID_WIDTH-1 && grid[y][x+1] === 'floor') neighbors++;
-                    if (y > 0 && grid[y-1][x] === 'floor') neighbors++;
-                    if (y < GRID_HEIGHT-1 && grid[y+1][x] === 'floor') neighbors++;
-                    
-                    if (neighbors >= 2 && Math.abs(x - player.x) + Math.abs(y - player.y) > 3) {
-                        key.x = x;
-                        key.y = y;
-                        key.collected = false;
-                        grid[y][x] = 'key';
-                        keyPlaced = true;
-                    }
-                }
+                currentX += platformWidth + gapSize;
             }
             
-            // Размещаем дверь (должна быть достижима и не рядом с ключом)
-            let doorPlaced = false;
-            while (!doorPlaced) {
-                let x = Math.floor(Math.random() * GRID_WIDTH);
-                let y = Math.floor(Math.random() * GRID_HEIGHT);
-                
-                if (isValidCell(x, y) && !(x === key.x && y === key.y)) {
-                    // Проверяем, что дверь не в тупике
-                    let neighbors = 0;
-                    if (x > 0 && grid[y][x-1] === 'floor') neighbors++;
-                    if (x < GRID_WIDTH-1 && grid[y][x+1] === 'floor') neighbors++;
-                    if (y > 0 && grid[y-1][x] === 'floor') neighbors++;
-                    if (y < GRID_HEIGHT-1 && grid[y+1][x] === 'floor') neighbors++;
-                    
-                    if (neighbors >= 2 && Math.abs(x - key.x) + Math.abs(y - key.y) > 3) {
-                        door.x = x;
-                        door.y = y;
-                        grid[y][x] = 'door';
-                        doorPlaced = true;
-                    }
-                }
+            // Финальная платформа с дверью
+            const finalPlatformX = CANVAS_WIDTH - 150;
+            platforms.push({ x: finalPlatformX, y: groundY, width: 150, height: 40 });
+            
+            // Дверь на финальной платформе
+            door.x = finalPlatformX + 50;
+            door.y = groundY - door.height;
+            
+            // Дополнительные платформы в воздухе
+            const numFloatingPlatforms = 2 + level;
+            for (let i = 0; i < numFloatingPlatforms; i++) {
+                const fpX = 150 + i * 120;
+                const fpY = 200 + Math.random() * 150;
+                platforms.push({ x: fpX, y: fpY, width: 90, height: 20 });
             }
             
-            // Обновляем UI
-            document.getElementById('level').textContent = level;
+            // Крабики-монстры на платформах
+            const numCrabs = 1 + Math.floor(level / 2);
+            for (let i = 0; i < numCrabs; i++) {
+                const crabPlatform = platforms[Math.floor(Math.random() * (platforms.length - 1)) + 1];
+                crabs.push({ 
+                    x: crabPlatform.x + crabPlatform.width / 2, 
+                    y: crabPlatform.y - CRAB_SIZE.height,
+                    startX: crabPlatform.x,
+                    endX: crabPlatform.x + crabPlatform.width - CRAB_SIZE.width,
+                    direction: 1,
+                    speed: 1.5 + level * 0.3
+                });
+            }
+            
             updateMessage();
         }
 
         // ============================================
-        // ОБРАБОТКА ВВОДА
+        // ФИЗИКА ИГРОКА - ПЛАТФОРМЕР
         // ============================================
-        function handleKeyPress(event) {
-            let dx = 0, dy = 0;
-            
-            switch(event.key) {
-                case 'ArrowUp':
-                case 'w':
-                case 'W':
-                    dy = -1;
-                    break;
-                case 'ArrowDown':
-                case 's':
-                case 'S':
-                    dy = 1;
-                    break;
-                case 'ArrowLeft':
-                case 'a':
-                case 'A':
-                    dx = -1;
-                    break;
-                case 'ArrowRight':
-                case 'd':
-                case 'D':
-                    dx = 1;
-                    break;
-                default:
-                    return; // Не обрабатываем другие клавиши
+        function updatePlayer() {
+            // Горизонтальное движение
+            player.vx = 0;
+            if (keys['ArrowLeft'] || keys['KeyA']) {
+                player.vx = -MOVE_SPEED;
+                player.facingRight = false;
+            }
+            if (keys['ArrowRight'] || keys['KeyD']) {
+                player.vx = MOVE_SPEED;
+                player.facingRight = true;
             }
             
-            event.preventDefault();
-            movePlayer(dx, dy);
-        }
-
-        // ============================================
-        // ДВИЖЕНИЕ ИГРОКА
-        // ============================================
-        function movePlayer(dx, dy) {
-            const newX = player.x + dx;
-            const newY = player.y + dy;
-            
-            // Проверка границ
-            if (newX < 0 || newX >= GRID_WIDTH || newY < 0 || newY >= GRID_HEIGHT) {
-                return;
+            // Прыжок
+            if ((keys['Space'] || keys['ArrowUp'] || keys['KeyW']) && player.onGround) {
+                player.vy = JUMP_FORCE;
+                player.onGround = false;
             }
             
-            // Проверка на пропасть
-            for (let pit of pits) {
-                if (pit.x === newX && pit.y === newY) {
-                    return; // Нельзя ходить по пропасти
+            // Применяем гравитацию
+            player.vy += GRAVITY;
+            
+            // Движение по X
+            player.x += player.vx;
+            
+            // Проверка границ экрана по X
+            if (player.x < 0) player.x = 0;
+            if (player.x + PLAYER_SIZE.width > CANVAS_WIDTH) player.x = CANVAS_WIDTH - PLAYER_SIZE.width;
+            
+            // Коллизия с платформами по X
+            for (let platform of platforms) {
+                if (checkCollision(player, platform)) {
+                    if (player.vx > 0) {
+                        player.x = platform.x - PLAYER_SIZE.width;
+                    } else if (player.vx < 0) {
+                        player.x = platform.x + platform.width;
+                    }
                 }
             }
             
-            // Движение разрешено
-            player.x = newX;
-            player.y = newY;
+            // Движение по Y
+            player.y += player.vy;
+            player.onGround = false;
             
-            // Проверка столкновения с монстром
-            for (let monster of monsters) {
-                if (monster.x === player.x && monster.y === player.y) {
+            // Коллизия с платформами по Y
+            for (let platform of platforms) {
+                if (checkCollision(player, platform)) {
+                    if (player.vy > 0) { // Падаем вниз
+                        player.y = platform.y - PLAYER_SIZE.height;
+                        player.vy = 0;
+                        player.onGround = true;
+                    } else if (player.vy < 0) { // Прыгаем вверх
+                        player.y = platform.y + platform.height;
+                        player.vy = 0;
+                    }
+                }
+            }
+            
+            // Проверка падения в лаву
+            for (let lava of lavaPits) {
+                if (checkCollision(player, lava)) {
                     restartLevel();
                     return;
                 }
             }
             
-            // Проверка сбора ключа
-            if (!hasKey && key.x === player.x && key.y === player.y) {
-                hasKey = true;
-                key.collected = true;
-                updateMessage();
+            // Проверка столкновения с крабиками
+            for (let crab of crabs) {
+                if (checkCollision(player, { x: crab.x, y: crab.y, width: CRAB_SIZE.width, height: CRAB_SIZE.height })) {
+                    restartLevel();
+                    return;
+                }
             }
             
             // Проверка достижения двери
-            if (hasKey && door.x === player.x && door.y === player.y) {
+            if (checkCollision(player, door)) {
                 nextLevel();
                 return;
             }
+            
+            // Падение за пределы экрана
+            if (player.y > CANVAS_HEIGHT) {
+                restartLevel();
+            }
+        }
+        
+        // Проверка прямоугольной коллизии
+        function checkCollision(rect1, rect2) {
+            return rect1.x < rect2.x + rect2.width &&
+                   rect1.x + rect1.width > rect2.x &&
+                   rect1.y < rect2.y + rect2.height &&
+                   rect1.y + rect1.height > rect2.y;
         }
 
         // ============================================
-        // ДВИЖЕНИЕ МОНСТРОВ
+        // ДВИЖЕНИЕ КРАБИКОВ
         // ============================================
-        function moveMonsters() {
-            for (let monster of monsters) {
-                // Вычисляем направление к игроку
-                let dx = 0, dy = 0;
+        function updateCrabs() {
+            for (let crab of crabs) {
+                crab.x += crab.direction * crab.speed;
                 
-                if (player.x > monster.x) dx = 1;
-                else if (player.x < monster.x) dx = -1;
-                
-                if (player.y > monster.y) dy = 1;
-                else if (player.y < monster.y) dy = -1;
-                
-                // Монстр двигается по одной оси за раз (сначала X, потом Y)
-                let moved = false;
-                
-                // Пробуем двигаться по X
-                if (dx !== 0) {
-                    const newX = monster.x + dx;
-                    const newY = monster.y;
-                    
-                    if (canMonsterMoveTo(newX, newY)) {
-                        monster.x = newX;
-                        monster.y = newY;
-                        moved = true;
-                    }
-                }
-                
-                // Если не смогли двигаться по X, пробуем Y
-                if (!moved && dy !== 0) {
-                    const newX = monster.x;
-                    const newY = monster.y + dy;
-                    
-                    if (canMonsterMoveTo(newX, newY)) {
-                        monster.x = newX;
-                        monster.y = newY;
-                    }
-                }
-                
-                // Проверка столкновения с игроком после движения
-                if (monster.x === player.x && monster.y === player.y) {
-                    restartLevel();
-                    return;
+                // Разворот на границах платформы
+                if (crab.x <= crab.startX || crab.x >= crab.endX) {
+                    crab.direction *= -1;
                 }
             }
         }
-
-        // Проверка, может ли монстр переместиться в клетку
-        function canMonsterMoveTo(x, y) {
-            // Границы
-            if (x < 0 || x >= GRID_WIDTH || y < 0 || y >= GRID_HEIGHT) {
-                return false;
-            }
-            
-            // Пропасти
-            for (let pit of pits) {
-                if (pit.x === x && pit.y === y) {
-                    return false;
-                }
-            }
-            
-            // Другие монстры
-            for (let monster of monsters) {
-                if (monster.x === x && monster.y === y) {
-                    return false;
-                }
-            }
-            
-            return true;
-        }
-
+        
         // ============================================
         // ПЕРЕЗАПУСК И СЛЕДУЮЩИЙ УРОВЕНЬ
         // ============================================
         function restartLevel() {
-            // Игрок теряет жизнь - перезапускаем текущий уровень
-            player.x = Math.floor(GRID_WIDTH / 2);
-            player.y = Math.floor(GRID_HEIGHT / 2);
-            
-            // Сбрасываем позицию ключа (если был собран)
-            hasKey = false;
-            key.collected = false;
-            
-            // Пересоздаём монстров на их исходных позициях
-            // Для простоты просто генерируем уровень заново с тем же номером
             generateLevel();
         }
 
@@ -388,70 +319,162 @@
 
         function updateMessage() {
             const messageEl = document.getElementById('message');
-            if (hasKey) {
-                messageEl.textContent = 'Открой дверь!';
-            } else {
-                messageEl.textContent = 'Собери ключ!';
-            }
+            messageEl.textContent = 'Уровень: ' + level + ' | Доберись до двери!';
         }
 
         // ============================================
-        // ОТРИСОВКА
+        // ОТРИСОВКА - ПЛАТФОРМЕР
         // ============================================
         function draw() {
-            // Очистка экрана
-            ctx.fillStyle = COLORS.FLOOR;
-            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            // Градиентный фон неба
+            const gradient = ctx.createLinearGradient(0, 0, 0, CANVAS_HEIGHT);
+            gradient.addColorStop(0, COLORS.SKY_TOP);
+            gradient.addColorStop(1, COLORS.SKY_BOTTOM);
+            ctx.fillStyle = gradient;
+            ctx.fillRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
             
-            // Рисуем пропасти
-            ctx.fillStyle = COLORS.PIT;
-            for (let pit of pits) {
-                ctx.fillRect(pit.x * TILE_SIZE, pit.y * TILE_SIZE, TILE_SIZE, TILE_SIZE);
+            // Рисуем платформы
+            for (let platform of platforms) {
+                // Трава сверху
+                ctx.fillStyle = COLORS.PLATFORM_GRASS;
+                ctx.fillRect(platform.x, platform.y, platform.width, 5);
+                
+                // Земля платформы
+                ctx.fillStyle = COLORS.PLATFORM;
+                ctx.fillRect(platform.x, platform.y + 5, platform.width, platform.height - 5);
+            }
+            
+            // Рисуем лаву
+            for (let lava of lavaPits) {
+                // Светящийся эффект
+                ctx.fillStyle = COLORS.LAVA_GLOW;
+                ctx.fillRect(lava.x - 2, lava.y - 2, lava.width + 4, lava.height + 4);
+                
+                // Основная лава
+                ctx.fillStyle = COLORS.LAVA;
+                ctx.fillRect(lava.x, lava.y, lava.width, lava.height);
+                
+                // Волны лавы (анимация)
+                ctx.fillStyle = '#FF8C00';
+                const waveOffset = Math.sin(Date.now() / 200) * 3;
+                ctx.fillRect(lava.x + 5, lava.y + waveOffset, lava.width - 10, 5);
             }
             
             // Рисуем дверь
-            ctx.fillStyle = COLORS.DOOR;
-            ctx.fillRect(door.x * TILE_SIZE + 5, door.y * TILE_SIZE + 5, TILE_SIZE - 10, TILE_SIZE - 10);
+            drawDoor();
             
-            // Рисуем ключ (если ещё не собран)
-            if (!key.collected) {
-                ctx.fillStyle = COLORS.KEY;
-                ctx.beginPath();
-                ctx.arc(
-                    key.x * TILE_SIZE + TILE_SIZE / 2,
-                    key.y * TILE_SIZE + TILE_SIZE / 2,
-                    TILE_SIZE / 3,
-                    0,
-                    Math.PI * 2
-                );
-                ctx.fill();
-            }
-            
-            // Рисуем монстров
-            ctx.fillStyle = COLORS.MONSTER;
-            for (let monster of monsters) {
-                ctx.fillRect(monster.x * TILE_SIZE + 8, monster.y * TILE_SIZE + 8, TILE_SIZE - 16, TILE_SIZE - 16);
+            // Рисуем крабиков
+            for (let crab of crabs) {
+                drawCrab(crab);
             }
             
             // Рисуем игрока
-            ctx.fillStyle = COLORS.PLAYER;
-            ctx.fillRect(player.x * TILE_SIZE + 10, player.y * TILE_SIZE + 10, TILE_SIZE - 20, TILE_SIZE - 20);
+            drawPlayer();
+        }
+        
+        // Рисование двери
+        function drawDoor() {
+            // Рама двери
+            ctx.fillStyle = COLORS.DOOR_FRAME;
+            ctx.fillRect(door.x, door.y, door.width, door.height);
+            
+            // Панель двери
+            ctx.fillStyle = COLORS.DOOR_PANEL;
+            ctx.fillRect(door.x + 5, door.y + 5, door.width - 10, door.height - 10);
+            
+            // Ручка двери
+            ctx.fillStyle = '#FFD700';
+            ctx.beginPath();
+            ctx.arc(door.x + door.width - 12, door.y + door.height / 2, 4, 0, Math.PI * 2);
+            ctx.fill();
+            
+            // Декоративные панели на двери
+            ctx.fillStyle = '#DEB887';
+            ctx.fillRect(door.x + 10, door.y + 10, door.width - 25, 20);
+            ctx.fillRect(door.x + 10, door.y + 35, door.width - 25, 20);
+        }
+        
+        // Рисование крабика
+        function drawCrab(crab) {
+            const x = crab.x;
+            const y = crab.y;
+            
+            // Тело краба (овальное)
+            ctx.fillStyle = COLORS.CRAB_BODY;
+            ctx.beginPath();
+            ctx.ellipse(x + CRAB_SIZE.width / 2, y + CRAB_SIZE.height / 2, 
+                       CRAB_SIZE.width / 2, CRAB_SIZE.height / 2.5, 0, 0, Math.PI * 2);
+            ctx.fill();
+            
+            // Глаза
+            ctx.fillStyle = 'white';
+            ctx.beginPath();
+            ctx.arc(x + CRAB_SIZE.width / 3, y + CRAB_SIZE.height / 3, 4, 0, Math.PI * 2);
+            ctx.arc(x + CRAB_SIZE.width * 2 / 3, y + CRAB_SIZE.height / 3, 4, 0, Math.PI * 2);
+            ctx.fill();
+            
+            ctx.fillStyle = 'black';
+            ctx.beginPath();
+            ctx.arc(x + CRAB_SIZE.width / 3, y + CRAB_SIZE.height / 3, 2, 0, Math.PI * 2);
+            ctx.arc(x + CRAB_SIZE.width * 2 / 3, y + CRAB_SIZE.height / 3, 2, 0, Math.PI * 2);
+            ctx.fill();
+            
+            // Клешни
+            ctx.fillStyle = COLORS.CRAB_LEGS;
+            if (crab.direction > 0) {
+                // Правая клешня впереди
+                ctx.fillRect(x - 5, y + CRAB_SIZE.height / 2 - 5, 10, 8);
+                ctx.fillRect(x + CRAB_SIZE.width - 5, y + CRAB_SIZE.height / 2 - 8, 10, 10);
+            } else {
+                // Левая клешня впереди
+                ctx.fillRect(x - 5, y + CRAB_SIZE.height / 2 - 8, 10, 10);
+                ctx.fillRect(x + CRAB_SIZE.width - 5, y + CRAB_SIZE.height / 2 - 5, 10, 8);
+            }
+            
+            // Ноги краба
+            ctx.fillStyle = COLORS.CRAB_LEGS;
+            for (let i = 0; i < 4; i++) {
+                const legY = y + CRAB_SIZE.height / 2 + i * 4;
+                ctx.fillRect(x - 3, legY, 6, 3);
+                ctx.fillRect(x + CRAB_SIZE.width - 3, legY, 6, 3);
+            }
+        }
+        
+        // Рисование игрока
+        function drawPlayer() {
+            const x = player.x;
+            const y = player.y;
+            
+            // Тело
+            ctx.fillStyle = COLORS.PLAYER_BODY;
+            ctx.fillRect(x + 5, y + 20, PLAYER_SIZE.width - 10, PLAYER_SIZE.height - 25);
+            
+            // Голова
+            ctx.fillStyle = COLORS.PLAYER_HEAD;
+            ctx.beginPath();
+            ctx.arc(x + PLAYER_SIZE.width / 2, y + 12, 12, 0, Math.PI * 2);
+            ctx.fill();
+            
+            // Глаза
+            ctx.fillStyle = 'black';
+            const eyeOffset = player.facingRight ? 3 : -3;
+            ctx.beginPath();
+            ctx.arc(x + PLAYER_SIZE.width / 2 + eyeOffset + 4, y + 10, 2, 0, Math.PI * 2);
+            ctx.fill();
+            
+            // Ноги
+            ctx.fillStyle = '#4169E1';
+            ctx.fillRect(x + 8, y + PLAYER_SIZE.height - 12, 8, 12);
+            ctx.fillRect(x + PLAYER_SIZE.width - 16, y + PLAYER_SIZE.height - 12, 8, 12);
         }
 
         // ============================================
         // ИГРОВОЙ ЦИКЛ
         // ============================================
         function gameLoop(timestamp) {
-            // Вычисляем дельту времени
-            const deltaTime = timestamp - lastTime;
-            lastTime = timestamp;
-            
-            // Таймер для движения монстров
-            monsterMoveTimer += deltaTime;
-            if (monsterMoveTimer >= MONSTER_MOVE_INTERVAL) {
-                moveMonsters();
-                monsterMoveTimer = 0;
-            }
+            // Обновление физики
+            updatePlayer();
+            updateCrabs();
             
             // Отрисовка
             draw();
