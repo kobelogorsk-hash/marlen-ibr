@@ -115,9 +115,12 @@
         // ГЕНЕРАЦИЯ УРОВНЯ - ПЛАТФОРМЕР
         // ============================================
         function generateLevel() {
-            // Сброс состояния игрока
+            // Базовая платформа (земля) с разрывами для лавы
+            const groundY = CANVAS_HEIGHT - 40;
+            
+            // Сброс состояния игрока - спавн на стартовой платформе
             player.x = 50;
-            player.y = 300;
+            player.y = groundY - PLAYER_SIZE.height;
             player.vx = 0;
             player.vy = 0;
             player.onGround = false;
@@ -126,10 +129,6 @@
             crabs = [];
             lavaPits = [];
             
-            // Базовая платформа (земля) с разрывами для лавы
-            const groundY = CANVAS_HEIGHT - 40;
-            
-            // Создаём платформы
             // Стартовая платформа
             platforms.push({ x: 0, y: groundY, width: 200, height: 40 });
             
