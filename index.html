@@ -219,6 +219,12 @@
             // Применяем гравитацию
             player.vy += GRAVITY;
             
+            // Ограничиваем максимальную скорость падения (чтобы не проваливался)
+            const maxFallSpeed = 15;
+            if (player.vy > maxFallSpeed) {
+                player.vy = maxFallSpeed;
+            }
+            
             // Движение по X
             player.x += player.vx;
             
@@ -237,20 +243,28 @@
                 }
             }
             
-            // Движение по Y
-            player.y += player.vy;
+            // Движение по Y с суб-шагами для предотвращения проваливания
             player.onGround = false;
             
-            // Коллизия с платформами по Y
-            for (let platform of platforms) {
-                if (checkCollision(player, platform)) {
-                    if (player.vy > 0) { // Падаем вниз
-                        player.y = platform.y - PLAYER_SIZE.height;
-                        player.vy = 0;
-                        player.onGround = true;
-                    } else if (player.vy < 0) { // Прыгаем вверх
-                        player.y = platform.y + platform.height;
-                        player.vy = 0;
+            // Разбиваем движение по Y на несколько небольших шагов
+            const steps = 4;
+            const stepVy = player.vy / steps;
+            
+            for (let i = 0; i < steps; i++) {
+                player.y += stepVy;
+                
+                // Коллизия с платформами по Y на каждом шаге
+                for (let platform of platforms) {
+                    if (checkCollision(player, platform)) {
+                        if (stepVy > 0) { // Падаем вниз
+                            player.y = platform.y - PLAYER_SIZE.height;
+                            player.vy = 0;
+                            player.onGround = true;
+                        } else if (stepVy < 0) { // Прыгаем вверх
+                            player.y = platform.y + platform.height;
+                            player.vy = 0;
+                        }
+                        break; // Выходим из цикла платформ после коллизии
                     }
                 }
             }
