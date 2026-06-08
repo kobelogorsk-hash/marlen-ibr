@@ -105,51 +105,47 @@
 
         function getLevelData(level) {
             const levels = [
-                // Уровень 1 - простой
+                // Уровень 1 - простой обучающий
                 {
                     playerStart: { x: 50, y: 50 },
-                    keyPos: { x: CANVAS_WIDTH - 80, y: CANVAS_HEIGHT - 80 },
-                    doorPos: { x: CANVAS_WIDTH - 100, y: 50 },
+                    keyPos: { x: CANVAS_WIDTH - 80, y: CANVAS_HEIGHT / 2 },
+                    doorPos: { x: CANVAS_WIDTH - 100, y: CANVAS_HEIGHT - 80 },
                     walls: [
-                        { x: 200, y: 0, width: 20, height: 400 },
-                        { x: 400, y: 200, width: 20, height: 400 },
-                        { x: 600, y: 0, width: 20, height: 350 },
-                        { x: 150, y: 450, width: 300, height: 20 }
+                        { x: 200, y: 0, width: 20, height: 300 },
+                        { x: 400, y: 300, width: 20, height: 300 },
+                        { x: 600, y: 0, width: 20, height: 250 }
                     ],
                     monsters: []
                 },
-                // Уровень 2 - с одним монстром
+                // Уровень 2 - один монстр
                 {
                     playerStart: { x: 50, y: 50 },
-                    keyPos: { x: CANVAS_WIDTH - 80, y: 80 },
+                    keyPos: { x: CANVAS_WIDTH - 80, y: CANVAS_HEIGHT - 80 },
                     doorPos: { x: 80, y: CANVAS_HEIGHT - 100 },
                     walls: [
-                        { x: 150, y: 0, width: 20, height: 300 },
+                        { x: 150, y: 0, width: 20, height: 250 },
                         { x: 300, y: 150, width: 350, height: 20 },
-                        { x: 500, y: 300, width: 20, height: 300 },
-                        { x: 200, y: 450, width: 250, height: 20 }
+                        { x: 500, y: 350, width: 20, height: 250 }
                     ],
                     monsters: [
                         { x: 400, y: 200, width: 35, height: 35, speedX: 2, speedY: 0, minX: 250, maxX: 550, minY: 180, maxY: 280 }
                     ]
                 },
-                // Уровень 3 - больше стен и два монстра
+                // Уровень 3 - открытая арена с двумя монстрами
                 {
                     playerStart: { x: 50, y: 300 },
-                    keyPos: { x: CANVAS_WIDTH - 80, y: CANVAS_HEIGHT - 80 },
+                    keyPos: { x: CANVAS_WIDTH - 80, y: 300 },
                     doorPos: { x: CANVAS_WIDTH - 100, y: 50 },
                     walls: [
-                        { x: 150, y: 0, width: 20, height: 250 },
-                        { x: 150, y: 350, width: 20, height: 250 },
-                        { x: 350, y: 100, width: 20, height: 400 },
-                        { x: 550, y: 0, width: 20, height: 250 },
-                        { x: 550, y: 350, width: 20, height: 250 },
-                        { x: 200, y: 280, width: 130, height: 20 },
-                        { x: 400, y: 300, width: 130, height: 20 }
+                        { x: 200, y: 0, width: 20, height: 200 },
+                        { x: 200, y: 400, width: 20, height: 200 },
+                        { x: 400, y: 0, width: 20, height: 150 },
+                        { x: 400, y: 450, width: 20, height: 150 },
+                        { x: 600, y: 200, width: 20, height: 200 }
                     ],
                     monsters: [
-                        { x: 200, y: 100, width: 35, height: 35, speedX: 0, speedY: 2.5, minX: 180, maxX: 320, minY: 50, maxY: 250 },
-                        { x: 600, y: 400, width: 35, height: 35, speedX: 3, speedY: 0, minX: 580, maxX: 750, minY: 380, maxY: 480 }
+                        { x: 300, y: 100, width: 35, height: 35, speedX: 0, speedY: 2, minX: 280, maxX: 380, minY: 50, maxY: 250 },
+                        { x: 500, y: 400, width: 35, height: 35, speedX: 2.5, speedY: 0, minX: 480, maxX: 680, minY: 380, maxY: 480 }
                     ]
                 },
                 // Уровень 4 - лабиринт с тремя монстрами
@@ -158,41 +154,36 @@
                     keyPos: { x: CANVAS_WIDTH - 80, y: CANVAS_HEIGHT - 80 },
                     doorPos: { x: 50, y: CANVAS_HEIGHT - 100 },
                     walls: [
-                        { x: 120, y: 0, width: 20, height: 400 },
-                        { x: 240, y: 200, width: 20, height: 400 },
-                        { x: 360, y: 0, width: 20, height: 350 },
-                        { x: 480, y: 150, width: 20, height: 450 },
-                        { x: 600, y: 0, width: 20, height: 300 },
-                        { x: 720, y: 250, width: 20, height: 350 },
-                        { x: 100, y: 500, width: 200, height: 20 },
-                        { x: 400, y: 80, width: 150, height: 20 }
+                        { x: 120, y: 0, width: 20, height: 300 },
+                        { x: 240, y: 300, width: 20, height: 300 },
+                        { x: 360, y: 0, width: 20, height: 250 },
+                        { x: 480, y: 250, width: 20, height: 350 },
+                        { x: 600, y: 0, width: 20, height: 200 },
+                        { x: 720, y: 400, width: 20, height: 200 }
                     ],
                     monsters: [
                         { x: 180, y: 50, width: 35, height: 35, speedX: 0, speedY: 2, minX: 150, maxX: 220, minY: 30, maxY: 180 },
                         { x: 400, y: 400, width: 35, height: 35, speedX: 2.5, speedY: 0, minX: 380, maxX: 460, minY: 380, maxY: 550 },
-                        { x: 650, y: 150, width: 35, height: 35, speedX: 0, speedY: 3, minX: 620, maxX: 700, minY: 100, maxY: 230 }
+                        { x: 650, y: 150, width: 35, height: 35, speedX: 0, speedY: 2.5, minX: 620, maxX: 700, minY: 100, maxY: 230 }
                     ]
                 },
-                // Уровень 5 - сложный с четырьмя монстрами
+                // Уровень 5 - финальный вызов
                 {
                     playerStart: { x: 50, y: 300 },
-                    keyPos: { x: CANVAS_WIDTH / 2 - 10, y: CANVAS_HEIGHT / 2 - 10 },
+                    keyPos: { x: CANVAS_WIDTH / 2, y: CANVAS_HEIGHT / 2 },
                     doorPos: { x: CANVAS_WIDTH - 100, y: CANVAS_HEIGHT - 100 },
                     walls: [
-                        { x: 150, y: 0, width: 20, height: 200 },
-                        { x: 150, y: 400, width: 20, height: 200 },
+                        { x: 150, y: 0, width: 20, height: 180 },
+                        { x: 150, y: 420, width: 20, height: 180 },
                         { x: 300, y: 150, width: 20, height: 300 },
-                        { x: 450, y: 0, width: 20, height: 250 },
-                        { x: 450, y: 350, width: 20, height: 250 },
-                        { x: 600, y: 200, width: 20, height: 250 },
-                        { x: 200, y: 280, width: 80, height: 20 },
-                        { x: 500, y: 280, width: 80, height: 20 },
-                        { x: 350, y: 450, width: 150, height: 20 }
+                        { x: 450, y: 0, width: 20, height: 200 },
+                        { x: 450, y: 400, width: 20, height: 200 },
+                        { x: 600, y: 200, width: 20, height: 200 }
                     ],
                     monsters: [
                         { x: 100, y: 100, width: 35, height: 35, speedX: 2, speedY: 0, minX: 80, maxX: 280, minY: 80, maxY: 180 },
-                        { x: 350, y: 50, width: 35, height: 35, speedX: 0, speedY: 2.5, minX: 330, maxX: 430, minY: 30, maxY: 130 },
-                        { x: 650, y: 300, width: 35, height: 35, speedX: 3, speedY: 0, minX: 620, maxX: 750, minY: 280, maxY: 380 },
+                        { x: 350, y: 50, width: 35, height: 35, speedX: 0, speedY: 2, minX: 330, maxX: 430, minY: 30, maxY: 130 },
+                        { x: 650, y: 300, width: 35, height: 35, speedX: 2.5, speedY: 0, minX: 620, maxX: 750, minY: 280, maxY: 380 },
                         { x: 250, y: 500, width: 35, height: 35, speedX: 0, speedY: 2, minX: 230, maxX: 330, minY: 480, maxY: 560 }
                     ]
                 }
