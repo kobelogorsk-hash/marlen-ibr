@@ -8,43 +8,42 @@
         body {
             margin: 0;
             padding: 20px;
-            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
+            background: #1a1a2e;
             color: white;
-            font-family: 'Segoe UI', Arial, sans-serif;
+            font-family: 'Courier New', monospace;
             display: flex;
             flex-direction: column;
             align-items: center;
             min-height: 100vh;
+            image-rendering: pixelated;
         }
         canvas {
-            border: 4px solid #e94560;
+            border: 4px solid #ff6b6b;
             background: #2d2d44;
-            box-shadow: 0 0 30px rgba(233, 69, 96, 0.4), 0 10px 40px rgba(0,0,0,0.6);
-            border-radius: 8px;
+            box-shadow: none;
+            border-radius: 0;
+            image-rendering: pixelated;
         }
         #ui {
             margin-bottom: 15px;
             text-align: center;
-            background: rgba(255, 255, 255, 0.1);
+            background: #16213e;
             padding: 15px 30px;
-            border-radius: 10px;
-            backdrop-filter: blur(10px);
+            border-radius: 0;
+            border: 2px solid #ff6b6b;
         }
         #message {
             margin-top: 15px;
-            font-size: 24px;
+            font-size: 20px;
             color: #ffd700;
-            text-shadow: 0 0 10px rgba(255, 215, 0, 0.5);
             font-weight: bold;
         }
         h1 {
-            color: #e94560;
+            color: #ff6b6b;
             margin: 0 0 10px 0;
-            text-shadow: 0 0 20px rgba(233, 69, 96, 0.5);
         }
         p {
             margin: 5px 0;
-            opacity: 0.9;
         }
     </style>
 </head>
@@ -65,13 +64,16 @@
         
         const COLORS = {
             FLOOR: '#2d2d44',
-            WALL: '#e94560',
+            WALL: '#ff6b6b',
             PLAYER: '#00ff88',
             KEY: '#ffd700',
             DOOR_LOCKED: '#ff6b6b',
             DOOR_OPEN: '#4ecdc4',
             MONSTER: '#ff00ff'
         };
+
+        const MONSTER_CHASE_DISTANCE = 150;
+        const MONSTER_CHASE_SPEED = 2.5;
 
         let canvas, ctx;
         let player = { x: 50, y: 50 };
@@ -280,16 +282,32 @@
 
             // Обновление монстров и проверка столкновений
             for (let monster of monsters) {
-                // Движение монстра
-                monster.x += monster.speedX;
-                monster.y += monster.speedY;
+                // Вычисляем расстояние до игрока
+                const dx = player.x - monster.x;
+                const dy = player.y - monster.y;
+                const distance = Math.sqrt(dx * dx + dy * dy);
                 
-                // Патрулирование в пределах зоны
-                if (monster.x <= monster.minX || monster.x >= monster.maxX) {
-                    monster.speedX *= -1;
-                }
-                if (monster.y <= monster.minY || monster.y >= monster.maxY) {
-                    monster.speedY *= -1;
+                // Если игрок в зоне видимости - преследуем
+                if (distance < MONSTER_CHASE_DISTANCE) {
+                    // Нормализуем вектор направления
+                    const normalizedDx = dx / distance;
+                    const normalizedDy = dy / distance;
+                    
+                    // Движение к игроку
+                    monster.x += normalizedDx * MONSTER_CHASE_SPEED;
+                    monster.y += normalizedDy * MONSTER_CHASE_SPEED;
+                } else {
+                    // Патрулирование в пределах зоны
+                    monster.x += monster.speedX;
+                    monster.y += monster.speedY;
+                    
+                    // Разворот на границах зоны
+                    if (monster.x <= monster.minX || monster.x >= monster.maxX) {
+                        monster.speedX *= -1;
+                    }
+                    if (monster.y <= monster.minY || monster.y >= monster.maxY) {
+                        monster.speedY *= -1;
+                    }
                 }
                 
                 // Проверка столкновения с игроком
@@ -329,13 +347,13 @@
         }
 
         function draw() {
-            // Рисуем пол с текстурой плитки
+            // Рисуем пол - сплошной цвет в ретро стиле
             ctx.fillStyle = COLORS.FLOOR;
             ctx.fillRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
             
-            // Рисуем сетку пола (эффект плитки)
-            ctx.strokeStyle = 'rgba(255, 255, 255, 0.05)';
-            ctx.lineWidth = 1;
+            // Рисуем сетку пола (эффект плитки) - более контрастная для ретро стиля
+            ctx.strokeStyle = '#3d3d5c';
+            ctx.lineWidth = 2;
             const tileSize = 40;
             for (let x = 0; x < CANVAS_WIDTH; x += tileSize) {
                 ctx.beginPath();
@@ -350,214 +368,139 @@
                 ctx.stroke();
             }
             
-            // Рисуем стены с эффектом объема
+            // Рисуем стены в ретро стиле - простые прямоугольники
             for (let wall of walls) {
-                // Тень стены
-                ctx.fillStyle = 'rgba(0, 0, 0, 0.3)';
-                ctx.fillRect(wall.x + 4, wall.y + 4, wall.width, wall.height);
-                
                 // Основная часть стены
                 ctx.fillStyle = COLORS.WALL;
                 ctx.fillRect(wall.x, wall.y, wall.width, wall.height);
                 
-                // Блик сверху
-                ctx.fillStyle = 'rgba(255, 255, 255, 0.2)';
-                ctx.fillRect(wall.x, wall.y, wall.width, 4);
+                // Контур стены для ретро эффекта
+                ctx.strokeStyle = '#8b0000';
+                ctx.lineWidth = 2;
+                ctx.strokeRect(wall.x, wall.y, wall.width, wall.height);
                 
-                // Декоративные элементы на стенах
-                ctx.fillStyle = 'rgba(0, 0, 0, 0.2)';
-                const brickHeight = 8;
-                for (let by = wall.y; by < wall.y + wall.height; by += brickHeight * 2) {
-                    ctx.fillRect(wall.x + 2, by + 2, wall.width - 4, 2);
+                // Простые кирпичики
+                ctx.fillStyle = '#cc5555';
+                const brickHeight = 10;
+                for (let by = wall.y + 2; by < wall.y + wall.height - 2; by += brickHeight * 2) {
+                    ctx.fillRect(wall.x + 3, by + 2, wall.width - 6, 3);
                 }
             }
             
-            // Рисуем дверь
+            // Рисуем дверь в ретро стиле
             if (door.open) {
                 // Открытая дверь - темный проход
-                ctx.fillStyle = '#1a1a2e';
+                ctx.fillStyle = '#000000';
                 ctx.fillRect(door.x, door.y, door.width, door.height);
-                // Свет из прохода
-                ctx.fillStyle = 'rgba(78, 205, 196, 0.3)';
-                ctx.fillRect(door.x + 5, door.y + 5, door.width - 10, door.height - 10);
+                // Простая рамка
+                ctx.strokeStyle = '#4ecdc4';
+                ctx.lineWidth = 2;
+                ctx.strokeRect(door.x + 2, door.y + 2, door.width - 4, door.height - 4);
             } else {
-                // Закрытая дверь с деталями
-                // Тень
-                ctx.fillStyle = 'rgba(0, 0, 0, 0.3)';
-                ctx.fillRect(door.x + 3, door.y + 3, door.width, door.height);
-                
-                // Основная дверь
+                // Закрытая дверь в ретро стиле
                 ctx.fillStyle = COLORS.DOOR_LOCKED;
                 ctx.fillRect(door.x, door.y, door.width, door.height);
                 
                 // Рама двери
-                ctx.strokeStyle = '#c0392b';
+                ctx.strokeStyle = '#8b0000';
                 ctx.lineWidth = 3;
-                ctx.strokeRect(door.x + 2, door.y + 2, door.width - 4, door.height - 4);
+                ctx.strokeRect(door.x, door.y, door.width, door.height);
                 
-                // Панели на двери
-                ctx.fillStyle = 'rgba(0, 0, 0, 0.2)';
-                ctx.fillRect(door.x + 5, door.y + 8, door.width - 10, 18);
-                ctx.fillRect(door.x + 5, door.y + 32, door.width - 10, 18);
+                // Крест-панели на двери (ретро стиль)
+                ctx.fillStyle = '#8b0000';
+                ctx.fillRect(door.x + door.width/2 - 3, door.y, 6, door.height);
+                ctx.fillRect(door.x, door.y + door.height/2 - 3, door.width, 6);
                 
-                // Золотая ручка/замок
+                // Золотая ручка
                 ctx.fillStyle = '#FFD700';
                 ctx.beginPath();
-                ctx.arc(door.x + door.width - 12, door.y + door.height / 2, 6, 0, Math.PI * 2);
-                ctx.fill();
-                ctx.fillStyle = '#b8860b';
-                ctx.beginPath();
-                ctx.arc(door.x + door.width - 12, door.y + door.height / 2, 3, 0, Math.PI * 2);
+                ctx.arc(door.x + door.width - 10, door.y + door.height / 2, 5, 0, Math.PI * 2);
                 ctx.fill();
             }
             
-            // Рисуем ключ
+            // Рисуем ключ в ретро стиле
             if (!key.taken) {
-                // Свечение вокруг ключа
-                ctx.fillStyle = 'rgba(255, 215, 0, 0.3)';
-                ctx.beginPath();
-                ctx.arc(key.x + 10, key.y + 10, 18, 0, Math.PI * 2);
-                ctx.fill();
-                
-                // Основная часть ключа
+                // Основная часть ключа - пиксельный стиль
                 ctx.fillStyle = COLORS.KEY;
-                ctx.fillRect(key.x, key.y + 6, 14, 8);
-                ctx.fillRect(key.x + 14, key.y + 4, 6, 12);
-                ctx.beginPath();
-                ctx.arc(key.x, key.y + 10, 6, 0, Math.PI * 2);
-                ctx.fill();
+                ctx.fillRect(key.x, key.y + 8, 12, 6);
+                ctx.fillRect(key.x + 12, key.y + 6, 4, 10);
+                ctx.fillRect(key.x + 16, key.y + 10, 4, 4);
+                ctx.fillRect(key.x + 16, key.y + 6, 4, 4);
                 
-                // Блик на ключе
-                ctx.fillStyle = 'rgba(255, 255, 255, 0.6)';
-                ctx.beginPath();
-                ctx.arc(key.x - 2, key.y + 8, 3, 0, Math.PI * 2);
-                ctx.fill();
-            }
-            
-            // Рисуем монстров
-            for (let monster of monsters) {
-                // Тень монстра
-                ctx.fillStyle = 'rgba(0, 0, 0, 0.4)';
-                ctx.beginPath();
-                ctx.ellipse(monster.x + monster.width / 2, monster.y + monster.height + 3, monster.width / 2, 6, 0, 0, Math.PI * 2);
-                ctx.fill();
-                
-                // Тело монстра (вид сверху) - злой красный/фиолетовый круг
-                ctx.fillStyle = COLORS.MONSTER;
-                ctx.beginPath();
-                ctx.arc(monster.x + monster.width / 2, monster.y + monster.height / 2, monster.width / 2, 0, Math.PI * 2);
-                ctx.fill();
-                
-                // Обводка монстра
-                ctx.strokeStyle = '#cc00cc';
-                ctx.lineWidth = 2;
-                ctx.stroke();
-                
-                // Злые глаза монстра
-                ctx.fillStyle = '#ff0000';
-                ctx.beginPath();
-                ctx.arc(monster.x + monster.width / 2 - 8, monster.y + monster.height / 2 - 3, 6, 0, Math.PI * 2);
-                ctx.arc(monster.x + monster.width / 2 + 8, monster.y + monster.height / 2 - 3, 6, 0, Math.PI * 2);
-                ctx.fill();
-                
-                // Зрачки монстра
-                ctx.fillStyle = '#ffff00';
-                ctx.beginPath();
-                ctx.arc(monster.x + monster.width / 2 - 7, monster.y + monster.height / 2 - 2, 3, 0, Math.PI * 2);
-                ctx.arc(monster.x + monster.width / 2 + 9, monster.y + monster.height / 2 - 2, 3, 0, Math.PI * 2);
-                ctx.fill();
-                
-                // Злой рот
-                ctx.strokeStyle = '#ff0000';
+                // Кольцо ключа
+                ctx.strokeStyle = COLORS.KEY;
                 ctx.lineWidth = 3;
-                ctx.beginPath();
-                ctx.arc(monster.x + monster.width / 2, monster.y + monster.height / 2 + 8, 10, 0.2 * Math.PI, 0.8 * Math.PI);
-                ctx.stroke();
-                
-                // Шипы/рога
-                ctx.fillStyle = '#ff0066';
-                ctx.beginPath();
-                ctx.moveTo(monster.x + monster.width / 2 - 10, monster.y + 5);
-                ctx.lineTo(monster.x + monster.width / 2 - 5, monster.y - 5);
-                ctx.lineTo(monster.x + monster.width / 2, monster.y + 5);
-                ctx.fill();
-                ctx.beginPath();
-                ctx.moveTo(monster.x + monster.width / 2 + 10, monster.y + 5);
-                ctx.lineTo(monster.x + monster.width / 2 + 5, monster.y - 5);
-                ctx.lineTo(monster.x + monster.width / 2, monster.y + 5);
-                ctx.fill();
+                ctx.strokeRect(key.x - 4, key.y + 6, 8, 10);
             }
             
-            // Рисуем игрока
-            // Тень игрока
-            ctx.fillStyle = 'rgba(0, 0, 0, 0.4)';
-            ctx.beginPath();
-            ctx.ellipse(player.x + PLAYER_SIZE / 2, player.y + PLAYER_SIZE + 3, PLAYER_SIZE / 2, 6, 0, 0, Math.PI * 2);
-            ctx.fill();
+            // Рисуем монстров в ретро/пиксельном стиле
+            for (let monster of monsters) {
+                // Тело монстра - квадратный спрайт
+                ctx.fillStyle = COLORS.MONSTER;
+                ctx.fillRect(monster.x, monster.y, monster.width, monster.height);
+                
+                // Контур монстра
+                ctx.strokeStyle = '#8b008b';
+                ctx.lineWidth = 2;
+                ctx.strokeRect(monster.x, monster.y, monster.width, monster.height);
+                
+                // Злые глаза - простые квадраты
+                ctx.fillStyle = '#ff0000';
+                ctx.fillRect(monster.x + 6, monster.y + 8, 8, 8);
+                ctx.fillRect(monster.x + monster.width - 14, monster.y + 8, 8, 8);
+                
+                // Зрачки
+                ctx.fillStyle = '#ffff00';
+                ctx.fillRect(monster.x + 8, monster.y + 10, 4, 4);
+                ctx.fillRect(monster.x + monster.width - 12, monster.y + 10, 4, 4);
+                
+                // Злой рот - простая линия
+                ctx.fillStyle = '#ff0000';
+                ctx.fillRect(monster.x + 8, monster.y + monster.height - 10, monster.width - 16, 4);
+                
+                // Рога/шипы
+                ctx.fillStyle = '#ff0066';
+                ctx.fillRect(monster.x + 4, monster.y - 4, 6, 6);
+                ctx.fillRect(monster.x + monster.width - 10, monster.y - 4, 6, 6);
+            }
             
-            // Тело игрока (вид сверху)
+            // Рисуем игрока в ретро стиле
+            // Тело игрока - квадратный спрайт
             ctx.fillStyle = COLORS.PLAYER;
-            ctx.beginPath();
-            ctx.arc(player.x + PLAYER_SIZE / 2, player.y + PLAYER_SIZE / 2, PLAYER_SIZE / 2, 0, Math.PI * 2);
-            ctx.fill();
+            ctx.fillRect(player.x, player.y, PLAYER_SIZE, PLAYER_SIZE);
             
-            // Обводка игрока
+            // Контур игрока
             ctx.strokeStyle = '#00cc6a';
             ctx.lineWidth = 2;
-            ctx.stroke();
+            ctx.strokeRect(player.x, player.y, PLAYER_SIZE, PLAYER_SIZE);
             
-            // Глаза (вид сверху)
+            // Глаза - простые квадраты
             ctx.fillStyle = 'white';
-            ctx.beginPath();
-            ctx.arc(player.x + PLAYER_SIZE / 2 - 6, player.y + PLAYER_SIZE / 2 - 2, 5, 0, Math.PI * 2);
-            ctx.arc(player.x + PLAYER_SIZE / 2 + 6, player.y + PLAYER_SIZE / 2 - 2, 5, 0, Math.PI * 2);
-            ctx.fill();
+            ctx.fillRect(player.x + 6, player.y + 8, 6, 6);
+            ctx.fillRect(player.x + PLAYER_SIZE - 12, player.y + 8, 6, 6);
             
             // Зрачки
             ctx.fillStyle = 'black';
-            ctx.beginPath();
-            ctx.arc(player.x + PLAYER_SIZE / 2 - 5, player.y + PLAYER_SIZE / 2 - 2, 3, 0, Math.PI * 2);
-            ctx.arc(player.x + PLAYER_SIZE / 2 + 7, player.y + PLAYER_SIZE / 2 - 2, 3, 0, Math.PI * 2);
-            ctx.fill();
-            
-            // Блик в глазах
-            ctx.fillStyle = 'white';
-            ctx.beginPath();
-            ctx.arc(player.x + PLAYER_SIZE / 2 - 4, player.y + PLAYER_SIZE / 2 - 4, 1.5, 0, Math.PI * 2);
-            ctx.arc(player.x + PLAYER_SIZE / 2 + 8, player.y + PLAYER_SIZE / 2 - 4, 1.5, 0, Math.PI * 2);
-            ctx.fill();
+            ctx.fillRect(player.x + 8, player.y + 10, 3, 3);
+            ctx.fillRect(player.x + PLAYER_SIZE - 10, player.y + 10, 3, 3);
             
             // Если ключ взят - рисуем его у игрока
             if (key.taken && !won) {
                 ctx.fillStyle = COLORS.KEY;
-                // Свечение
-                ctx.shadowColor = COLORS.KEY;
-                ctx.shadowBlur = 10;
-                ctx.beginPath();
-                ctx.arc(player.x + PLAYER_SIZE / 2, player.y - 8, 10, 0, Math.PI * 2);
-                ctx.fill();
-                ctx.shadowBlur = 0;
-                
-                // Детали ключа
-                ctx.fillStyle = '#b8860b';
-                ctx.beginPath();
-                ctx.arc(player.x + PLAYER_SIZE / 2, player.y - 8, 5, 0, Math.PI * 2);
-                ctx.fill();
+                ctx.fillRect(player.x + PLAYER_SIZE - 8, player.y + PLAYER_SIZE - 10, 6, 8);
             }
             
-            // Эффект победы
+            // Эффект победы в ретро стиле
             if (won) {
-                ctx.fillStyle = 'rgba(255, 215, 0, 0.1)';
+                ctx.fillStyle = 'rgba(255, 215, 0, 0.3)';
                 ctx.fillRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
                 
-                // Искры
+                // Простые искры-квадраты
                 for (let i = 0; i < 20; i++) {
                     const sparkX = Math.random() * CANVAS_WIDTH;
                     const sparkY = Math.random() * CANVAS_HEIGHT;
-                    ctx.fillStyle = `hsl(${Math.random() * 60 + 40}, 100%, 50%)`;
-                    ctx.beginPath();
-                    ctx.arc(sparkX, sparkY, 3, 0, Math.PI * 2);
-                    ctx.fill();
+                    ctx.fillStyle = '#ffd700';
+                    ctx.fillRect(sparkX, sparkY, 6, 6);
                 }
             }
         }
